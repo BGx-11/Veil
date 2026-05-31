@@ -82,10 +82,14 @@ export default function BrowserShell() {
     dnsOverHttps: true,
     blockWebRTC: true,
     torMode: false,
+    httpsOnly: false,
     darkMode: true,
     bookmarks: [] as {url: string, title: string}[],
     blocklist: [] as string[]
   });
+  
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   const wvRefs = useRef<Record<string, any>>({});
   const api = typeof window !== 'undefined' ? (window as any).electronAPI : null;
@@ -156,6 +160,10 @@ export default function BrowserShell() {
       });
       wv.addEventListener('did-fail-load', (e: any) => {
         if (e.isMainFrame) {
+          if (settingsRef.current.httpsOnly && e.validatedURL && e.validatedURL.startsWith('https://') && e.errorCode !== -3) {
+            setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, error: `HTTPS_UPGRADE_FAILED:${e.validatedURL}`, loading: false } : t)));
+            return;
+          }
           const errMsg = e.errorCode === -3 
             ? 'Request Blocked: This page was stopped by the built-in privacy shield.' 
             : `Failed to load: ${e.errorDescription} (${e.errorCode})`;
@@ -316,7 +324,13 @@ export default function BrowserShell() {
         api.updateBlocklist(value);
       }
     } else {
-      setSettings((s) => ({ ...s, [key]: value !== undefined ? value : !(s as any)[key] }));
+      setSettings((s) => {
+        const nextVal = value !== undefined ? value : !(s as any)[key];
+        if (api && api.updateSettings) {
+          api.updateSettings({ [key]: nextVal });
+        }
+        return { ...s, [key]: nextVal };
+      });
     }
   };
 
@@ -526,10 +540,12 @@ export default function BrowserShell() {
                           <Shield size={64} color="var(--red)" />
                         </div>
                         <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
-                          {tab.error.includes('SOCKS') ? 'Tor Network Offline' : tab.error.includes('Blocked') ? 'Site Blocked by Custom Rules' : 'Connection Failed'}
+                          {tab.error.startsWith('HTTPS_UPGRADE_FAILED') ? 'This site doesn\'t support HTTPS' : tab.error.includes('SOCKS') ? 'Tor Network Offline' : tab.error.includes('Blocked') ? 'Site Blocked by Custom Rules' : 'Connection Failed'}
                         </h2>
                         <p style={{ color: 'var(--text-3)', lineHeight: 1.6, fontSize: '14px', margin: 0 }}>
-                          {tab.error.includes('SOCKS') 
+                          {tab.error.startsWith('HTTPS_UPGRADE_FAILED')
+                            ? 'SecureBrowser blocked the insecure version. Proceeding would expose your traffic.'
+                            : tab.error.includes('SOCKS') 
                             ? 'SecureBrowser could not route your request through the Tor network. It may take a minute to bootstrap, or it might be blocked on your network.' 
                             : tab.error.includes('Blocked')
                             ? 'SecureBrowser has intercepted a connection to this domain because it matches your Custom Website Blocker rules or tracking shield.'
@@ -540,7 +556,12 @@ export default function BrowserShell() {
                         </div>
                         <div style={{ display: 'flex', gap: '12px', marginTop: '16px', width: '100%' }}>
                           <button onClick={goBack} style={{ flex: 1, padding: '12px', background: 'transparent', borderRadius: '8px', color: 'var(--text-1)', border: '1px solid var(--border)', cursor: 'pointer', fontWeight: 600 }}>Go Back Safely</button>
-                          {tab.error.includes('SOCKS') ? (
+                          {tab.error.startsWith('HTTPS_UPGRADE_FAILED') ? (
+                            <button onClick={() => {
+                                const insecureUrl = tab.error!.replace('HTTPS_UPGRADE_FAILED:', '').replace('https://', 'http://');
+                                nav(tab.id, insecureUrl + (insecureUrl.includes('?') ? '&' : '?') + '__sb_allow_http=1');
+                            }} style={{ flex: 1, padding: '12px', background: 'var(--red)', borderRadius: '8px', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Proceed anyway (unsafe)</button>
+                          ) : tab.error.includes('SOCKS') ? (
                             <button onClick={() => toggleSetting('torMode', false)} style={{ flex: 1, padding: '12px', background: 'var(--accent)', borderRadius: '8px', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Disable Tor</button>
                           ) : (
                             <button onClick={reload} style={{ flex: 1, padding: '12px', background: 'var(--accent)', borderRadius: '8px', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Try Again</button>

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   performSearch:  (query)  => ipcRenderer.invoke('perform-search', query),
   getTrackerCount: ()      => ipcRenderer.invoke('get-tracker-count'),
   updateBlocklist: (list)  => ipcRenderer.send('update-blocklist', list),
+  updateSettings:  (s)     => ipcRenderer.send('update-settings', s),
 
   // Window controls
   winMinimize: () => ipcRenderer.send('win-minimize'),

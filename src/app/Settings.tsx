@@ -33,6 +33,7 @@ const sections = [
     items: [
       { key: 'dnsOverHttps', label: 'DNS-over-HTTPS', desc: 'Encrypts DNS queries via Cloudflare (1.1.1.1)' },
       { key: 'torMode', label: 'Tor Routing', desc: 'Route all traffic through the Tor network (requires tor.exe in PATH)' },
+      { key: 'httpsOnly', label: 'HTTPS-only mode', desc: 'Upgrade all connections to HTTPS, block sites that refuse' },
     ],
   },
   {

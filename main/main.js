@@ -56,8 +56,22 @@ async function createWindow() {
     return allowedPermissions.includes(permission);
   });
 
-  // ── Custom Website Blocking ──
+  // ── Custom Website Blocking & HTTPS-Only ──
   secureSession.webRequest.onBeforeRequest((details, callback) => {
+    // ── HTTPS-only upgrade ──
+    if (
+      appSettings.httpsOnly &&
+      details.url.startsWith('http://') &&
+      !details.url.startsWith('http://localhost') &&
+      !details.url.includes('.local') &&
+      !details.url.match(/http:\/\/\d+\.\d+\.\d+\.\d+/) &&
+      details.resourceType === 'mainFrame' &&
+      !details.url.includes('__sb_allow_http=1')
+    ) {
+      const upgraded = details.url.replace('http://', 'https://');
+      return callback({ redirectURL: upgraded });
+    }
+
     try {
       if (details.url && !details.url.startsWith('browser://') && !details.url.startsWith('search://')) {
         const urlObj = new URL(details.url);
@@ -97,6 +111,9 @@ async function createWindow() {
     // Inject Privacy Control Headers
     details.requestHeaders['DNT'] = '1';
     details.requestHeaders['Sec-GPC'] = '1';
+    if (appSettings.httpsOnly) {
+      details.requestHeaders['Upgrade-Insecure-Requests'] = '1';
+    }
 
     // REMOVED: X-Forwarded-For and Client-IP headers.
     // Injecting random IP headers triggers strict bot-protection on YouTube and Cloudflare!
@@ -199,6 +216,11 @@ app.on('web-contents-created', (event, contents) => {
 });
 
 // ── IPC ──
+let appSettings = { httpsOnly: false };
+ipcMain.on('update-settings', (event, newSettings) => {
+  appSettings = { ...appSettings, ...newSettings };
+});
+
 ipcMain.on('get-preload-path', (event) => {
   event.returnValue = `file://${path.join(__dirname, 'preload-webview.js')}`;
 });
