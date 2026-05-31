@@ -1,0 +1,45 @@
+{
+  "name": "secure-browser",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"cross-env BROWSER=none npm run dev:next\" \"npm run dev:electron\"",
+    "dev:next": "next dev",
+    "dev:electron": "wait-on http://localhost:3000 && electron .",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "pack": "next build && electron-builder --dir",
+    "dist": "next build && electron-builder",
+    "cap:init": "cap init SecureBrowser com.secure.browser --web-dir out",
+    "cap:build": "next build && cap sync",
+    "cap:open": "cap open android",
+    "postinstall": "node scripts/download-tor.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@ghostery/adblocker-electron": "^2.17.3",
+    "cheerio": "^1.2.0",
+    "cross-fetch": "^4.1.0",
+    "lucide-react": "^1.17.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.0",
+    "cross-env": "^10.1.0",
+    "electron": "^42.3.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "typescript": "^5",
+    "wait-on": "^9.0.10"
+  }
+}
