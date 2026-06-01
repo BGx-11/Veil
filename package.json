@@ -1,5 +1,5 @@
 {
-  "name": "secure-browser",
+  "name": "veil-browser",
   "version": "0.1.0",
   "private": true,
   "main": "main/main.js",
@@ -12,7 +12,7 @@
     "lint": "eslint",
     "pack": "next build && electron-builder --dir",
     "dist": "next build && electron-builder",
-    "cap:init": "cap init SecureBrowser com.secure.browser --web-dir out",
+    "cap:init": "cap init VeilBrowser com.veil.browser --web-dir out",
     "cap:build": "next build && cap sync",
     "cap:open": "cap open android",
     "postinstall": "node scripts/download-tor.js"
@@ -21,6 +21,7 @@
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
     "@ghostery/adblocker-electron": "^2.17.3",
+    "@huggingface/transformers": "^4.2.0",
     "cheerio": "^1.2.0",
     "cross-fetch": "^4.1.0",
     "lucide-react": "^1.17.0",

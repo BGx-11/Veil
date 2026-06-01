@@ -3,11 +3,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Shield, Moon, Sun, Plus, X, ArrowLeft, ArrowRight, RotateCw, Home,
-  Minus, Square, Search, Lock, Globe, Settings as SettingsIcon, PanelLeft, Star, Volume2, Languages
+  Minus, Square, Search, Lock, Globe, Settings as SettingsIcon, PanelLeft, Star, Volume2, Languages, Bot, Video, Mic, Download
 } from 'lucide-react';
+
+const OnionIcon = ({ size = 24, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+    <path d="M12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18Z" />
+    <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" />
+  </svg>
+);
+
 import SearchResults from './SearchResults';
 import NewTab from './NewTab';
 import Settings from './Settings';
+import SLMPanel from './SLMPanel';
+import Downloads from './Downloads';
 
 /* ─── Types ─── */
 interface Tab {
@@ -19,6 +30,8 @@ interface Tab {
   loading: boolean;
   error?: string;
   mediaPlaying?: boolean;
+  cameraUsing?: boolean;
+  micUsing?: boolean;
   blockedTrackers?: number;
   redirectChain?: string[];
 }
@@ -45,9 +58,13 @@ const TabItem = React.memo(({ tab, activeId, sidebarOpen, onSelect, onClose }: a
       title={!sidebarOpen ? (tab.title || 'New Tab') : ''}
     >
       <Globe className="tab-item-icon" />
-      <div className="tab-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
+      <div className="tab-title" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.title}</span>
-        {tab.mediaPlaying && <Volume2 size={12} color="var(--accent)" style={{ marginLeft: '6px', flexShrink: 0 }} />}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+        {tab.cameraUsing && <Video size={12} color="var(--red)" />}
+        {tab.micUsing && <Mic size={12} color="var(--orange)" />}
+        {tab.mediaPlaying && !tab.cameraUsing && !tab.micUsing && <Volume2 size={12} color="var(--accent)" />}
       </div>
       {tab.loading && <div className="tab-item-dot" />}
       <button className="tab-item-close" onClick={(e) => onClose(e, tab.id)}>
@@ -69,10 +86,40 @@ export default function BrowserShell() {
   const [ipInfo, setIpInfo] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [slmOpen, setSlmOpen] = useState(false);
   const [shieldOpen, setShieldOpen] = useState(false);
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [translateTarget, setTranslateTarget] = useState('en');
   const [torBootstrapping, setTorBootstrapping] = useState(false);
   const [torProgress, setTorProgress] = useState({ percent: 0, text: '' });
   const [torError, setTorError] = useState('');
+
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const isDraggingRef = useRef(false);
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setTranslateOpen(false);
+      setShieldOpen(false);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const handleSidebarMouseDown = (e: React.MouseEvent) => {
+    isDraggingRef.current = true;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      setSidebarWidth(Math.max(150, Math.min(e.clientX, 600)));
+    };
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
 
   const [settings, setSettings] = useState({
     adBlocker: true,
@@ -98,6 +145,17 @@ export default function BrowserShell() {
   /* ─── Boot ─── */
   useEffect(() => {
     setMounted(true);
+    
+    // Load persisted settings
+    try {
+      const savedSettings = localStorage.getItem('veil-settings');
+      if (savedSettings) setSettings(s => ({ ...s, ...JSON.parse(savedSettings) }));
+      const savedWidth = localStorage.getItem('veil-sidebarWidth');
+      if (savedWidth) setSidebarWidth(Number(savedWidth));
+      const savedOpen = localStorage.getItem('veil-sidebarOpen');
+      if (savedOpen) setSidebarOpen(savedOpen === 'true');
+    } catch (e) {}
+
     if (api) {
       setPreloadPath(api.getPreloadPath());
       api.getTrackerCount().then((c: number) => setTrackerCount(c));
@@ -115,7 +173,15 @@ export default function BrowserShell() {
     }
   }, []);
 
-  /* ─── Theme sync ─── */
+  // Save persisted settings
+  useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('veil-settings', JSON.stringify(settings));
+    localStorage.setItem('veil-sidebarWidth', sidebarWidth.toString());
+    localStorage.setItem('veil-sidebarOpen', sidebarOpen.toString());
+  }, [settings, sidebarWidth, sidebarOpen, mounted]);
+
+  /* ─── Tor Progress Listener ─── */
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.darkMode ? 'dark' : 'light');
   }, [settings.darkMode]);
@@ -181,6 +247,12 @@ export default function BrowserShell() {
       });
       wv.addEventListener('media-paused', () => {
         setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, mediaPlaying: false } : t)));
+      });
+      wv.addEventListener('ipc-message', (e: any) => {
+        if (e.channel === 'media-devices-active') {
+          const { video, audio } = e.args[0];
+          setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, cameraUsing: video, micUsing: audio } : t)));
+        }
       });
       wv.addEventListener('did-redirect-navigation', (e: any) => {
         setTabs((p) => p.map((t) => {
@@ -345,7 +417,7 @@ export default function BrowserShell() {
       <div className="titlebar">
         <div className="titlebar-brand">
           <Shield />
-          <span>SecureBrowser</span>
+          <span>Veil</span>
         </div>
         <div className="titlebar-controls">
           <button className="tb-btn" onClick={winMin}><Minus size={13} /></button>
@@ -365,7 +437,8 @@ export default function BrowserShell() {
         </div>
 
         <form className="url-bar" onSubmit={handleSubmit} style={{ position: 'relative' }}>
-          <button type="button" className="url-lock" onClick={() => {
+          <button type="button" className="url-lock" onClick={(e) => {
+            e.stopPropagation();
             setShieldOpen(!shieldOpen);
             if (!shieldOpen) fetchIpInfo();
           }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
@@ -395,7 +468,7 @@ export default function BrowserShell() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Shield size={20} color={settings.torMode ? "var(--green)" : "var(--accent)"} />
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)' }}>SecureBrowser Shield</div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)' }}>Veil Shield</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{settings.torMode ? 'Tor Network Active' : 'Standard Protection'}</div>
                 </div>
               </div>
@@ -437,20 +510,70 @@ export default function BrowserShell() {
           )}
         </form>
 
-        <div className="toolbar-actions">
+        <div className="toolbar-actions" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
           <button 
-            className="nav-btn" 
-            onClick={() => {
-              if (active && active.url && !active.url.startsWith('browser://') && !active.url.includes('translate.google.com')) {
-                const translateUrl = `https://translate.google.com/translate?sl=auto&tl=en&u=${encodeURIComponent(active.url)}`;
-                setTabs(tabs.map(t => t.id === activeId ? { ...t, url: translateUrl, redirectChain: [] } : t));
-                setUrlInput(translateUrl);
-              }
-            }} 
+            className={`nav-btn ${translateOpen ? 'active' : ''}`}
+            onClick={() => setTranslateOpen(!translateOpen)} 
             title="Translate Page"
           >
             <Languages size={15} />
           </button>
+          
+          {translateOpen && (
+            <div style={{ position: 'absolute', top: '100%', right: '40px', marginTop: '8px', background: 'rgba(20, 20, 20, 0.85)', backdropFilter: 'blur(20px)', borderRadius: '12px', border: '1px solid var(--border)', padding: '16px', width: '220px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-1)' }}>Translate Page</div>
+              <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Target Language:</label>
+                <div style={{ position: 'relative' }}>
+                  <select 
+                    value={translateTarget} 
+                    onChange={(e) => setTranslateTarget(e.target.value)}
+                    style={{ 
+                      appearance: 'none', width: '100%', background: 'var(--bg-deep)', 
+                      border: '1px solid var(--border)', color: 'var(--text-1)', 
+                      padding: '10px 14px', borderRadius: '8px', fontSize: '13px', 
+                      outline: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+                  >
+                    <option value="en">English (EN)</option>
+                    <option value="es">Spanish (ES)</option>
+                    <option value="fr">French (FR)</option>
+                    <option value="de">German (DE)</option>
+                    <option value="zh-CN">Chinese (ZH)</option>
+                    <option value="ja">Japanese (JA)</option>
+                    <option value="ru">Russian (RU)</option>
+                  </select>
+                  <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-4)' }}>
+                    ▼
+                  </div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => {
+                  if (active && active.url && !active.url.startsWith('browser://') && !active.url.includes('translate.google.com')) {
+                    const translateUrl = `https://translate.google.com/translate?sl=auto&tl=${translateTarget}&u=${encodeURIComponent(active.url)}`;
+                    setTabs(tabs.map(t => t.id === activeId ? { ...t, url: translateUrl, redirectChain: [] } : t));
+                    setUrlInput(translateUrl);
+                  }
+                  setTranslateOpen(false);
+                }}
+                style={{ background: 'var(--accent)', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', marginTop: '4px' }}
+              >
+                Translate Now
+              </button>
+            </div>
+          )}
+
+          <button className={`nav-btn ${slmOpen ? 'active-slm' : ''}`} onClick={() => setSlmOpen(!slmOpen)} title="Veil AI">
+            <Bot size={15} color={slmOpen ? "var(--purple)" : "currentColor"} />
+          </button>
+          <button className="nav-btn" onClick={() => nav(activeId, 'browser://downloads')} title="Downloads"><Download size={15} /></button>
           <button className="nav-btn" onClick={() => setIsSettingsOpen(true)} title="Settings"><SettingsIcon size={15} /></button>
           <button className="nav-btn" onClick={() => toggleSetting('darkMode')} title="Theme">
             {settings.darkMode ? <Sun size={15} /> : <Moon size={15} />}
@@ -463,6 +586,7 @@ export default function BrowserShell() {
         {/* Sidebar */}
         <div 
           className={`sidebar ${sidebarOpen ? '' : 'minimized'}`}
+          style={{ width: sidebarOpen ? sidebarWidth : undefined, position: 'relative' }}
           onDrop={(e) => {
             e.preventDefault();
             const url = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
@@ -479,7 +603,7 @@ export default function BrowserShell() {
             <button className="tabs-add" onClick={addTab}><Plus size={13} /></button>
           </div>
 
-          <div className="tabs-scroll">
+          <div className={`tabs-scroll ${settings.torMode ? 'tor-mode' : ''}`}>
             {tabs.map((tab) => (
               <TabItem 
                 key={tab.id}
@@ -493,11 +617,19 @@ export default function BrowserShell() {
           </div>
 
           <div className="sidebar-bottom">
-            <div className="sidebar-stat">
-              <Shield />
-              <span>{trackerCount} blocked</span>
-            </div>
+            <button className="sidebar-stat" onClick={() => setIsSettingsOpen(true)}>
+              {settings.torMode ? <OnionIcon size={14} color="#7D4698" /> : <Shield size={14} />}
+              <span style={{ color: settings.torMode ? '#7D4698' : 'inherit' }}>{settings.torMode ? 'Tor Network' : 'Protected'}</span>
+            </button>
           </div>
+          
+          {sidebarOpen && (
+            <div 
+              className="sidebar-resizer" 
+              onMouseDown={handleSidebarMouseDown}
+              style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '4px', cursor: 'ew-resize', zIndex: 100 }}
+            />
+          )}
         </div>
 
         {/* Content */}
@@ -506,6 +638,8 @@ export default function BrowserShell() {
             <div key={tab.id} className={`tab-view ${activeId === tab.id ? 'active' : ''}`}>
               {tab.url === NEWTAB ? (
                 <NewTab onNavigate={(u) => nav(tab.id, u)} settings={settings} onToggleSetting={toggleSetting} />
+              ) : tab.url === 'browser://downloads' ? (
+                <Downloads />
               ) : tab.url.startsWith('search://') ? (
                 <SearchResults query={tab.url.replace('search://', '')} onNavigate={(u) => nav(tab.id, u)} />
               ) : mounted && api ? (
@@ -544,12 +678,12 @@ export default function BrowserShell() {
                         </h2>
                         <p style={{ color: 'var(--text-3)', lineHeight: 1.6, fontSize: '14px', margin: 0 }}>
                           {tab.error.startsWith('HTTPS_UPGRADE_FAILED')
-                            ? 'SecureBrowser blocked the insecure version. Proceeding would expose your traffic.'
+                            ? 'Veil blocked the insecure version. Proceeding would expose your traffic.'
                             : tab.error.includes('SOCKS') 
-                            ? 'SecureBrowser could not route your request through the Tor network. It may take a minute to bootstrap, or it might be blocked on your network.' 
+                            ? 'Veil could not route your request through the Tor network. It may take a minute to bootstrap, or it might be blocked on your network.' 
                             : tab.error.includes('Blocked')
-                            ? 'SecureBrowser has intercepted a connection to this domain because it matches your Custom Website Blocker rules or tracking shield.'
-                            : 'SecureBrowser was unable to load this page. Please check your internet connection or try again.'}
+                            ? 'Veil has intercepted a connection to this domain because it matches your Custom Website Blocker rules or tracking shield.'
+                            : 'Veil was unable to load this page. Please check your internet connection or try again.'}
                         </p>
                         <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px 16px', borderRadius: '8px', fontSize: '12px', color: 'var(--text-2)', fontFamily: 'monospace', width: '100%', textAlign: 'left', border: '1px solid var(--border)', marginTop: '8px', wordBreak: 'break-all' }}>
                           <strong>Diagnostic:</strong> {tab.error}
@@ -578,6 +712,8 @@ export default function BrowserShell() {
           ))}
         </div>
 
+        <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} />
+
         {isSettingsOpen && (
           <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
             <div className="settings-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -586,22 +722,7 @@ export default function BrowserShell() {
           </div>
         )}
 
-        {/* ── Tor Overlays ── */}
-        {torBootstrapping && (
-          <div className="tor-overlay">
-            <div className="tor-modal">
-              <Shield size={48} color="var(--green)" className="tor-icon-pulse" />
-              <h2 style={{ fontSize: '20px', margin: '0', color: 'var(--text-1)' }}>Establishing Tor Circuit</h2>
-              <div className="tor-progress-container">
-                <div className="tor-progress-bar" style={{ width: `${torProgress.percent}%` }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '12px' }}>
-                <span style={{ color: 'var(--text-3)' }}>{torProgress.text}</span>
-                <span style={{ color: 'var(--text-2)', fontWeight: 600 }}>{torProgress.percent}%</span>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* ── Tor Overlays Removed (Now handled inline in NewTab) ── */}
         
         {torError && (
           <div className="tor-overlay">

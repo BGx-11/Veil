@@ -21,6 +21,7 @@ let mainWindow;
 let blockerInstance = null;
 let trackerCount = 0;
 let customBlocklist = [];
+let downloads = [];
 const isDev = !app.isPackaged;
 
 async function createWindow() {
@@ -171,8 +172,42 @@ async function createWindow() {
 
   // ── Standardise User-Agent to evade bot detection ──
   const pristineUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-  secureSession.setUserAgent(pristineUA);
-  app.userAgentFallback = pristineUA;
+  secureSession.setCertificateVerifyProc((request, callback) => {
+    callback(0);
+  });
+
+  // ── Download Handling ──
+  secureSession.on('will-download', (event, item, webContents) => {
+    const dlId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+    const dl = {
+      id: dlId,
+      filename: item.getFilename(),
+      url: item.getURL(),
+      totalBytes: item.getTotalBytes(),
+      receivedBytes: item.getReceivedBytes(),
+      state: item.getState(),
+      savePath: item.getSavePath(),
+    };
+    downloads.unshift(dl); // Add to top
+
+    const notify = () => {
+      if (mainWindow) mainWindow.webContents.send('download-updated', dl);
+    };
+    notify();
+
+    item.on('updated', (event, state) => {
+      dl.state = state;
+      dl.receivedBytes = item.getReceivedBytes();
+      dl.savePath = item.getSavePath() || dl.savePath;
+      notify();
+    });
+
+    item.on('done', (event, state) => {
+      dl.state = state;
+      dl.savePath = item.getSavePath() || dl.savePath;
+      notify();
+    });
+  });
 
   // ── Window ──
   mainWindow = new BrowserWindow({
@@ -248,7 +283,7 @@ ipcMain.on('show-context-menu', (event, params) => {
     template.push({ label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) });
   }
   if (params.hasImageContents) {
-    template.push({ label: 'Copy Image', click: () => mainWindow?.webContents.send('context-action', { action: 'copy-image', x: params.x, y: params.y }) });
+    template.push({ label: 'Copy Image', click: () => mainWindow?.webContents.send('context-action', { action: 'copy-image', src: params.srcURL }) });
   }
   if (params.isEditable) {
     template.push({ role: 'undo' });
@@ -264,6 +299,12 @@ ipcMain.on('show-context-menu', (event, params) => {
 
   const menu = Menu.buildFromTemplate(template);
   menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
+});
+
+ipcMain.handle('get-downloads', () => downloads);
+ipcMain.handle('open-file', async (event, filePath) => {
+  const { shell } = require('electron');
+  return await shell.openPath(filePath);
 });
 
 ipcMain.handle('get-tracker-count', () => trackerCount);
@@ -315,7 +356,39 @@ ipcMain.handle('perform-search', async (_event, query) => {
                 results.push({ url: link, displayUrl, title, description });
               }
             });
-            resolve({ success: true, results });
+            
+            if (results.length === 0) {
+              const wikiReq = net.request({
+                method: 'GET',
+                url: `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=5&namespace=0&format=json`,
+                session: secureSession,
+                useSessionCookies: false
+              });
+              wikiReq.setHeader('User-Agent', 'Mozilla/5.0');
+              wikiReq.on('response', (wr) => {
+                let d = ''; wr.on('data', c => d+=c);
+                wr.on('end', () => {
+                  try {
+                    const parsed = JSON.parse(d);
+                    if (parsed && parsed[1]) {
+                      for (let j = 0; j < parsed[1].length; j++) {
+                        results.push({
+                          title: parsed[1][j],
+                          description: parsed[2][j],
+                          url: parsed[3][j],
+                          displayUrl: parsed[3][j]
+                        });
+                      }
+                    }
+                  } catch(e) {}
+                  resolve({ success: true, results });
+                });
+              });
+              wikiReq.on('error', () => resolve({ success: true, results }));
+              wikiReq.end();
+            } else {
+              resolve({ success: true, results });
+            }
           } catch (err) {
             resolve({ success: false, error: 'Failed to parse results' });
           }

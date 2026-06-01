@@ -18,6 +18,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Listen for tracker blocked events
   onTrackerBlocked: (cb) => ipcRenderer.on('tracker-blocked', (_e, count) => cb(count)),
+
+  // Downloads
+  getDownloads: () => ipcRenderer.invoke('get-downloads'),
+  openFile: (path) => ipcRenderer.invoke('open-file', path),
+  onDownloadUpdated: (cb) => {
+    ipcRenderer.removeAllListeners('download-updated');
+    ipcRenderer.on('download-updated', (_e, dl) => cb(dl));
+  },
   
   // Listen for new tab requests (target="_blank")
   onNewTabRequested: (cb) => {

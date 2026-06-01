@@ -159,4 +159,44 @@
   } else {
     Object.defineProperty(navigator, 'mediaDevices', { value: { enumerateDevices: () => Promise.resolve([]) } });
   }
+
+  // ══════════════════════════════════════
+  // TRACK CAMERA/MIC USAGE FOR INDICATORS
+  // ══════════════════════════════════════
+  try {
+    const { ipcRenderer } = require('electron');
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const origGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      
+      let activeStreams = [];
+      const updateMediaState = () => {
+        let video = false;
+        let audio = false;
+        activeStreams.forEach(stream => {
+          if (stream.getVideoTracks().some(t => t.readyState === 'live')) video = true;
+          if (stream.getAudioTracks().some(t => t.readyState === 'live')) audio = true;
+        });
+        ipcRenderer.sendToHost('media-devices-active', { video, audio });
+      };
+
+      navigator.mediaDevices.getUserMedia = function(constraints) {
+        return origGetUserMedia(constraints).then(stream => {
+          activeStreams.push(stream);
+          updateMediaState();
+          
+          stream.getTracks().forEach(track => {
+            track.addEventListener('ended', () => {
+              // Remove stream if all tracks ended, or just update state
+              updateMediaState();
+            });
+          });
+          
+          return stream;
+        });
+      };
+    }
+  } catch (e) {
+    // electron require might fail if nodeIntegration is off and context isolation is on,
+    // but in standard webview preload, require('electron') is available.
+  }
 })();

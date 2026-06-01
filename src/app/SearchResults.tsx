@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, BookOpen, ExternalLink } from 'lucide-react';
+import { Loader2, BookOpen, ExternalLink, Sparkles } from 'lucide-react';
+import { getSLMPipeline, removeSLMProgressCallback } from '@/lib/slm';
 
 interface SearchResult {
   title: string;
@@ -22,18 +23,70 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
   const [knowledgePanel, setKnowledgePanel] = useState<KnowledgePanelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [slmSummary, setSlmSummary] = useState<string | null>(null);
+  const [slmGenerating, setSlmGenerating] = useState(false);
+  const [slmProgress, setSlmProgress] = useState('Analyzing results...');
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     let alive = true;
+    let progressCb: any = null;
     setLoading(true);
     setError(null);
+    setSlmSummary(null);
 
     (async () => {
       try {
         if ((window as any).electronAPI) {
           const res = await (window as any).electronAPI.performSearch(query);
           if (!alive) return;
-          if (res.success) setResults(res.results);
+          if (res.success) {
+            setResults(res.results);
+            
+            // Trigger SLM Summarization in background
+            setSlmGenerating(true);
+            (async () => {
+              try {
+                progressCb = (data: any) => {
+                  if (data.status === 'downloading') {
+                    if (alive) {
+                      setSlmProgress(`Downloading Veil Neural Engine...`);
+                      setDownloadProgress((data.loaded / data.total) * 100);
+                    }
+                  } else if (data.status === 'init') {
+                    if (alive) {
+                      setSlmProgress('Initializing AI Engine...');
+                      setDownloadProgress(0);
+                    }
+                  } else if (data.status === 'ready') {             
+                    if (alive) setSlmProgress('Summarizing results...');
+                  }
+                };
+                const generator = await getSLMPipeline(progressCb);
+                const contextText = res.results.slice(0, 3).map((r: any) => r.title + ': ' + r.description).join('\n');
+                const messagesArray = [
+                  { role: 'system', content: 'You are Veil AI, an expert research assistant. Read the following search results and write a single, brief paragraph that directly answers the user\'s query. Do not use conversational filler, and do not include information not found in the results.' },
+                  { role: 'user', content: `Query: ${query}\n\nSearch Results:\n${contextText}` }
+                ];
+                const output = await generator(messagesArray, { max_new_tokens: 100 });
+                let text = output[0].generated_text;
+                if (Array.isArray(text)) {
+                  text = text[text.length - 1].content;
+                } else if (typeof text === 'string') {
+                  if (text.includes('<|assistant|>\n')) text = text.split('<|assistant|>\n').pop()?.trim() || text;
+                }
+                if (alive) setSlmSummary(text);
+              } catch (e: any) {
+                console.warn("Could not load AI model in SearchResults", e);
+                if (alive) {
+                  setSlmProgress(`AI Error: ${e.message}`);
+                  setSlmGenerating(false);
+                }
+              } finally {
+                if (alive) setSlmGenerating(false);
+              }
+            })();
+          }
           else setError(res.error || 'Search failed');
           
           // Try to fetch knowledge panel data from Wikipedia
@@ -62,7 +115,7 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
             if (alive) setKnowledgePanel(null);
           }
         } else {
-          setError('Search requires SecureBrowser desktop app.');
+          setError('Search requires Veil desktop app.');
         }
       } catch (err: any) {
         if (alive) setError(err.message);
@@ -71,7 +124,10 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
       }
     })();
 
-    return () => { alive = false; };
+    return () => { 
+      alive = false; 
+      if (progressCb) removeSLMProgressCallback(progressCb);
+    };
   }, [query]);
 
   const decoded = decodeURIComponent(query);
@@ -114,35 +170,95 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
 
           {!loading && !error && results.length > 0 && (
             <div className="search-list">
-              {results.map((r, i) => (
-                <div key={i} className="search-card" onClick={() => onNavigate(r.url)}>
-                  <div className="search-card-url">{r.displayUrl || r.url}</div>
-                  <div className="search-card-title">{r.title}</div>
-                  {r.description && <div className="search-card-desc">{r.description}</div>}
-                </div>
-              ))}
+              {results.map((r, i) => {
+                let urlObj;
+                try { urlObj = new URL(r.url); } catch (e) {}
+                const domain = urlObj ? urlObj.hostname : r.url;
+                return (
+                  <div key={i} className="search-card" onClick={() => onNavigate(r.url)}>
+                    <div className="search-card-url">
+                      <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} style={{ width: 14, height: 14, borderRadius: 2 }} alt="" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                      {r.displayUrl || r.url}
+                    </div>
+                    <h3 className="search-card-title">{r.title}</h3>
+                    <p className="search-card-desc">{r.description}</p>
+                  </div>
+                );
+              })}
+              
+              <button 
+                onClick={() => onNavigate(`https://duckduckgo.com/?q=${encodeURIComponent(query)}`)}
+                style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  background: 'var(--surface-hover)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  color: 'var(--text-1)',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s',
+                  width: '100%'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = 'var(--surface-active)'}
+                onMouseOut={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+              >
+                See more results on DuckDuckGo <ExternalLink size={14} />
+              </button>
             </div>
           )}
         </div>
 
-        {knowledgePanel ? (
-          <div className="search-sidebar-panel">
-            <div className="search-panel-card kp-card">
-              {knowledgePanel.thumbnail && (
-                <div className="kp-image" style={{ backgroundImage: `url(${knowledgePanel.thumbnail.source})` }} />
-              )}
-              <div className="kp-content">
-                <h3>{knowledgePanel.title}</h3>
-                <p>{knowledgePanel.extract}</p>
-                <div className="panel-divider" />
-                <button 
-                  className="kp-wiki-btn" 
-                  onClick={() => onNavigate(knowledgePanel.content_urls.desktop.page)}
-                >
-                  <BookOpen size={14} /> Read more on Wikipedia <ExternalLink size={14} />
-                </button>
+        {(knowledgePanel || slmSummary || slmGenerating) ? (
+          <div className="search-sidebar-panel" style={{ gap: '20px' }}>
+            
+            {/* Veil AI Summary Panel */}
+            <div className="search-panel-card kp-card" style={{ border: '1px solid var(--purple-dim)', boxShadow: '0 8px 32px var(--purple-dim)' }}>
+              <div className="kp-content" style={{ background: 'linear-gradient(to bottom, rgba(191,90,242,0.05), transparent)' }}>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--purple)', fontSize: '16px' }}>
+                  <Sparkles size={16} /> Veil AI Summary
+                </h3>
+                {slmGenerating && !slmSummary && (
+                  <div style={{ padding: '10px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-3)', fontSize: '13px' }}>
+                      <Loader2 size={14} className="spinning" /> {slmProgress}
+                    </div>
+                    {downloadProgress > 0 && (
+                      <div style={{ width: '100%', height: '4px', background: 'var(--surface-hover)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ width: `${downloadProgress}%`, height: '100%', background: 'var(--purple)', transition: 'width 0.2s', boxShadow: '0 0 10px var(--purple)' }} />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {slmSummary && (
+                  <p style={{ fontSize: '13px' }}>{slmSummary}</p>
+                )}
               </div>
             </div>
+
+            {knowledgePanel && (
+              <div className="search-panel-card kp-card">
+                {knowledgePanel.thumbnail && (
+                  <div className="kp-image" style={{ backgroundImage: `url(${knowledgePanel.thumbnail.source})` }} />
+                )}
+                <div className="kp-content">
+                  <h3>{knowledgePanel.title}</h3>
+                  <p>{knowledgePanel.extract}</p>
+                  <div className="panel-divider" />
+                  <button 
+                    className="kp-wiki-btn" 
+                    onClick={() => onNavigate(knowledgePanel.content_urls.desktop.page)}
+                  >
+                    <BookOpen size={14} /> Read more on Wikipedia <ExternalLink size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

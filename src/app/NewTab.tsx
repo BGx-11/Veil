@@ -1,16 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Shield, Image as ImageIcon, X, Clock, LayoutGrid, Plus, Trash2 } from 'lucide-react';
+import { Search, Shield, Image as ImageIcon, X, Clock, LayoutGrid, Plus, Trash2, ArrowRight } from 'lucide-react';
+
+const OnionIcon = ({ size = 24, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+    <path d="M12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18Z" />
+    <path d="M12 14C13.1046 14 14 13.1046 14 12C14 10.8954 13.1046 10 12 10C10.8954 10 10 10.8954 10 12C10 13.1046 10.8954 14 12 14Z" />
+  </svg>
+);
 
 const DEFAULT_SHORTCUTS = [
-  { label: 'DuckDuckGo', url: 'https://duckduckgo.com', letter: 'D' },
-  { label: 'Wikipedia', url: 'https://www.wikipedia.org', letter: 'W' },
-  { label: 'GitHub', url: 'https://github.com', letter: 'G' },
-  { label: 'Reddit', url: 'https://www.reddit.com', letter: 'R' },
+  { label: 'DuckDuckGo', url: 'https://duckduckgo.com', letter: 'D', color: '#DE5833' },
+  { label: 'Wikipedia', url: 'https://www.wikipedia.org', letter: 'W', color: '#000000' },
+  { label: 'GitHub', url: 'https://github.com', letter: 'G', color: '#2b3137' },
+  { label: 'Reddit', url: 'https://www.reddit.com', letter: 'R', color: '#FF4500' },
 ];
-
-
 
 export default function NewTab({ 
   onNavigate, 
@@ -41,9 +47,7 @@ export default function NewTab({
 
   useEffect(() => {
     try {
-      // Clean up old faulty storage
       localStorage.removeItem('newtab-bg');
-      
       const saved = localStorage.getItem('newtab-config');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -62,7 +66,19 @@ export default function NewTab({
     };
     tick();
     const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.nt-settings-panel') && !target.closest('.nt-settings-btn')) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const updateConfig = (key: string, value: any) => {
@@ -79,10 +95,12 @@ export default function NewTab({
       finalUrl = 'https://' + finalUrl;
     }
 
+    const colors = ['#007aff', '#34c759', '#ff9f0a', '#ff453a', '#bf5af2', '#64d2ff'];
     const newShortcut = {
       label: newShortcutLabel.trim(),
       url: finalUrl,
-      letter: newShortcutLabel.trim().charAt(0).toUpperCase()
+      letter: newShortcutLabel.trim().charAt(0).toUpperCase(),
+      color: colors[Math.floor(Math.random() * colors.length)]
     };
 
     updateConfig('shortcuts', [...config.shortcuts, newShortcut]);
@@ -110,164 +128,159 @@ export default function NewTab({
   const validBgUrl = (!config.bgUrl || config.bgUrl === 'undefined' || config.bgUrl === 'null') ? '' : config.bgUrl;
 
   return (
-    <div className="newtab" style={validBgUrl ? { backgroundImage: `url(${validBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
+    <div className="newtab-v2" style={validBgUrl ? { backgroundImage: `url(${validBgUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
       
-      {/* Animated gradient orbs */}
+      {/* Animated gradient orbs background */}
       {!validBgUrl && (
-        <>
-          <div className="newtab-orb" />
-          <div className="newtab-orb" />
-          <div className="newtab-orb" />
-        </>
+        <div className="nt-bg-container">
+          <div className="nt-orb nt-orb-1" />
+          <div className="nt-orb nt-orb-2" />
+          <div className="nt-orb nt-orb-3" />
+        </div>
       )}
 
       {/* Settings Toggle */}
       <button 
-        className="newtab-customize-btn" 
+        className="nt-settings-btn" 
         onClick={() => setShowSettings(!showSettings)}
         title="Customize Homepage"
       >
-        <ImageIcon size={18} />
+        <ImageIcon size={16} />
       </button>
 
-      {/* Advanced Settings Panel */}
+      {/* Tor Toggle - Top Left */}
+      {settings && onToggleSetting && (
+        <div style={{ position: 'absolute', top: 24, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="nt-tor-toggle">
+            <span className="nt-tor-label">
+              <OnionIcon size={14} color={settings.torMode ? '#bf5af2' : 'var(--text-3)'} /> 
+              {settings.torMode ? 'Tor Active' : 'Tor Off'}
+            </span>
+            <div
+              className={`toggle ${settings.torMode ? 'on' : ''}`}
+              onClick={async () => {
+                const el = document.getElementById('nt-tor-loading');
+                if (el) el.style.opacity = '1';
+                try {
+                  await onToggleSetting('torMode');
+                } finally {
+                  if (el) el.style.opacity = '0';
+                }
+              }}
+            />
+          </div>
+          <div id="nt-tor-loading" style={{ opacity: 0, fontSize: '11px', color: 'var(--text-3)', fontWeight: 500, transition: 'opacity 0.2s', whiteSpace: 'nowrap' }}>
+            {!settings.torMode ? 'Connecting...' : 'Disconnecting...'}
+          </div>
+        </div>
+      )}
+
+      {/* Settings Panel */}
       {showSettings && (
-        <div className="newtab-settings" style={{ width: '340px', maxHeight: '80vh', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-1)' }}>Customize Homepage</span>
-            <button onClick={() => setShowSettings(false)} style={{ background: 'none', border: 'none', color: 'var(--text-4)', cursor: 'pointer', transition: 'color var(--transition-fast)' }} onMouseOver={(e) => e.currentTarget.style.color = 'var(--text-1)'} onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-4)'}><X size={16} /></button>
+        <div className="nt-settings-panel">
+          <div className="nt-settings-header">
+            <span>Customize</span>
+            <button onClick={() => setShowSettings(false)}><X size={16} /></button>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Background Image</label>
-
+          <div className="nt-settings-group">
+            <label>Background Image URL</label>
             <input 
               type="text" 
-              placeholder="Or paste custom image URL..." 
+              placeholder="Paste image URL..." 
               value={validBgUrl} 
               onChange={(e) => updateConfig('bgUrl', e.target.value)} 
-              className="newtab-settings-input"
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px', paddingBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer' }}>
+          <div className="nt-settings-toggles">
+            <label>
               <input type="checkbox" checked={config.showClock} onChange={(e) => updateConfig('showClock', e.target.checked)} />
-              <Clock size={14} color="var(--text-3)" /> Show Clock & Date
+              <Clock size={14} /> Show Clock & Date
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer' }}>
+            <label>
               <input type="checkbox" checked={config.showShortcuts} onChange={(e) => updateConfig('showShortcuts', e.target.checked)} />
-              <LayoutGrid size={14} color="var(--text-3)" /> Show Shortcuts
+              <LayoutGrid size={14} /> Show Shortcuts
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', cursor: 'pointer' }}>
+            <label style={{ opacity: validBgUrl ? 1 : 0.5 }}>
               <input type="checkbox" checked={config.blurInner} onChange={(e) => updateConfig('blurInner', e.target.checked)} disabled={!validBgUrl} />
-              <ImageIcon size={14} color="var(--text-3)" /> Frost Search Panel
+              <ImageIcon size={14} /> Frost Background
             </label>
           </div>
 
-
-
-          <div>
-            <label style={{ fontSize: '12px', color: 'var(--text-3)', fontWeight: 600, display: 'block', marginBottom: '8px' }}>Manage Shortcuts</label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          <div className="nt-settings-group" style={{ marginTop: '20px' }}>
+            <label>Shortcuts</label>
+            <div className="nt-shortcuts-list">
               {config.shortcuts.map((s, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: '8px', transition: 'all var(--transition)' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px', fontWeight: 500 }}>{s.label}</div>
-                  <button onClick={() => removeShortcut(idx)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', display: 'flex', opacity: 0.7, transition: 'opacity var(--transition)' }} onMouseOver={(e) => e.currentTarget.style.opacity = '1'} onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}><Trash2 size={14} /></button>
+                <div key={idx} className="nt-shortcut-item">
+                  <span>{s.label}</span>
+                  <button onClick={() => removeShortcut(idx)}><Trash2 size={14} /></button>
                 </div>
               ))}
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <input type="text" placeholder="Shortcut Name (e.g. YouTube)" value={newShortcutLabel} onChange={(e) => setNewShortcutLabel(e.target.value)} className="newtab-settings-input" style={{ padding: '8px 10px', fontSize: '12px' }} />
+            <div className="nt-shortcut-add">
+              <input type="text" placeholder="Name" value={newShortcutLabel} onChange={(e) => setNewShortcutLabel(e.target.value)} />
               <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="text" placeholder="URL (e.g. youtube.com)" value={newShortcutUrl} onChange={(e) => setNewShortcutUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addShortcut()} className="newtab-settings-input" style={{ flex: 1, padding: '8px 10px', fontSize: '12px' }} />
-                <button onClick={addShortcut} style={{ background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '8px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Plus size={16} /></button>
+                <input type="text" placeholder="URL" value={newShortcutUrl} onChange={(e) => setNewShortcutUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addShortcut()} style={{ flex: 1 }} />
+                <button onClick={addShortcut}><Plus size={14} /></button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <div className="newtab-inner" style={(config.bgUrl && config.blurInner) ? { background: 'rgba(0,0,0,0.5)', borderRadius: '24px', backdropFilter: 'blur(16px)' } : {}}>
+      {/* Main Content */}
+      <div className={`nt-main-content ${(config.bgUrl && config.blurInner) ? 'frosted' : ''}`}>
         
         {config.showClock && (
-          <>
-            <div className="newtab-clock">{time}</div>
-            <div className="newtab-date">{date}</div>
-          </>
+          <div className="nt-time-container">
+            <h1 className="nt-clock">{time}</h1>
+            <p className="nt-date">{date}</p>
+          </div>
         )}
 
-        <div className="newtab-brand" style={{ marginTop: config.showClock ? '0' : '40px' }}>
-          <Shield />
-          <span>SecureBrowser</span>
+        <div className="nt-brand">
+          <span>VEIL</span>
         </div>
 
-        <form className="newtab-search" onSubmit={submit}>
-          <Search size={18} />
+        <form className="nt-search-box" onSubmit={submit}>
+          <Search size={20} className="nt-search-icon" />
           <input
             type="text"
-            placeholder="Search the web or enter a URL"
+            placeholder="Search the web or enter URL..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
           />
+          <button type="submit" className="nt-search-submit"><ArrowRight size={18} /></button>
         </form>
 
-        {settings && onToggleSetting && (
-          <div style={{ marginTop: '20px', padding: '10px 16px', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(10px)', borderRadius: '12px', border: '1px solid var(--glass-border)', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Shield size={14} color={settings.torMode ? 'var(--green)' : 'var(--text-3)'} /> Secure Tor Mode
-              </span>
-              <div
-                className={`toggle ${settings.torMode ? 'on' : ''}`}
-                onClick={async () => {
-                  const el = document.getElementById('newtab-tor-loading-main');
-                  if (el) el.style.display = 'block';
-                  try {
-                    await onToggleSetting('torMode');
-                  } finally {
-                    if (el) el.style.display = 'none';
-                  }
-                }}
-              />
-            </div>
-            <div id="newtab-tor-loading-main" style={{ display: 'none', fontSize: '11px', color: 'var(--accent)', marginTop: '8px' }}>
-              {!settings.torMode ? 'Starting Tor... This may take up to 15s.' : 'Disabling Tor...'}
-            </div>
-          </div>
-        )}
-
         {config.showShortcuts && (
-          <div className="newtab-shortcuts">
-            {config.shortcuts.map((s, idx) => (
-              <div key={idx} className="shortcut" onClick={() => onNavigate(s.url)}>
-                <div className="shortcut-icon">{s.letter}</div>
-                <div className="shortcut-label">{s.label}</div>
+          <div className="nt-shortcuts-grid">
+            {config.shortcuts.map((s: any, idx: number) => (
+              <div key={idx} className="nt-tile" onClick={() => onNavigate(s.url)}>
+                <div className="nt-tile-icon" style={{ background: 'var(--surface-hover)' }}>
+                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=64`} alt="" style={{ width: 32, height: 32, borderRadius: 8 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = s.letter; }} />
+                </div>
+                <span className="nt-tile-label">{s.label}</span>
               </div>
             ))}
           </div>
         )}
 
         {settings?.bookmarks && settings.bookmarks.length > 0 && (
-          <div style={{ marginTop: '30px', width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <h3 style={{ fontSize: '14px', color: 'var(--text-3)', fontWeight: 600, paddingLeft: '8px' }}>Bookmarks</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          <div className="nt-bookmarks-section">
+            <h3>Bookmarks</h3>
+            <div className="nt-bookmarks-grid">
               {settings.bookmarks.map((b: any, i: number) => (
-                <div 
-                  key={i} 
-                  onClick={() => onNavigate(b.url)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '16px', cursor: 'pointer', backdropFilter: 'blur(10px)', boxShadow: 'var(--shadow-sm)', transition: 'all var(--transition-spring)' }}
-                  onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)'; e.currentTarget.style.background = 'var(--surface-hover)' }}
-                  onMouseOut={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'var(--glass-bg)' }}
-                >
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, color: 'var(--accent)' }}>
-                    {b.title ? b.title.charAt(0).toUpperCase() : '?'}
+                <div key={i} className="nt-bookmark-card" onClick={() => onNavigate(b.url)}>
+                  <div className="nt-bookmark-icon">
+                    <img src={`https://www.google.com/s2/favicons?domain=${new URL(b.url).hostname}&sz=32`} alt="" style={{ width: 20, height: 20 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = b.title ? b.title.charAt(0).toUpperCase() : '?'; }} />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title || b.url}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.url}</span>
+                  <div className="nt-bookmark-info">
+                    <span className="nt-bookmark-title">{b.title || b.url}</span>
+                    <span className="nt-bookmark-url">{b.url}</span>
                   </div>
                 </div>
               ))}
