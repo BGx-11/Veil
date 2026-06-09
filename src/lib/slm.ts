@@ -1,7 +1,7 @@
 import { pipeline, env } from '@huggingface/transformers';
 
 env.allowLocalModels = true;
-env.allowRemoteModels = false;
+env.allowRemoteModels = true;
 // @ts-ignore
 env.localModelPath = '/models/';
 env.useBrowserCache = false;
@@ -17,7 +17,7 @@ export async function getSLMPipeline(progressCallback?: (data: any) => void) {
   }
   
   if (!_generatorPromise) {
-    _generatorPromise = pipeline('text-generation', 'Xenova/TinyLlama-1.1B-Chat-v1.0', {
+    _generatorPromise = pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
       device: 'webgpu',
       dtype: 'q4f16',
       progress_callback: (data: any) => {

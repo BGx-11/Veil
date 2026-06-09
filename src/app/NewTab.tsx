@@ -21,15 +21,18 @@ const DEFAULT_SHORTCUTS = [
 export default function NewTab({ 
   onNavigate, 
   settings, 
-  onToggleSetting 
+  onToggleSetting,
+  recentHistory
 }: { 
   onNavigate: (url: string) => void;
   settings?: any;
   onToggleSetting?: (key: string) => Promise<void>;
+  recentHistory?: {url: string, title: string, timestamp: number}[];
 }) {
   const [query, setQuery] = useState('');
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
+  const [greeting, setGreeting] = useState('');
   
   // Customization State
   const [config, setConfig] = useState({
@@ -63,6 +66,9 @@ export default function NewTab({
       const now = new Date();
       setTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       setDate(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }));
+      // Set greeting based on time
+      const hour = now.getHours();
+      setGreeting(hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening');
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -139,41 +145,45 @@ export default function NewTab({
         </div>
       )}
 
-      {/* Settings Toggle */}
-      <button 
-        className="nt-settings-btn" 
-        onClick={() => setShowSettings(!showSettings)}
-        title="Customize Homepage"
-      >
-        <ImageIcon size={16} />
-      </button>
+      {/* Top Right Controls */}
+      <div style={{ position: 'absolute', top: 24, right: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Tor Toggle */}
+        {settings && onToggleSetting && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div id="nt-tor-loading" style={{ opacity: 0, fontSize: '11px', color: 'var(--text-3)', fontWeight: 500, transition: 'opacity 0.2s', whiteSpace: 'nowrap' }}>
+              {!settings.torMode ? 'Connecting...' : 'Disconnecting...'}
+            </div>
+            <div className="nt-tor-toggle">
+              <span className="nt-tor-label" style={{ color: settings.torMode ? '#bf5af2' : 'var(--text-3)' }}>
+                <OnionIcon size={14} color={settings.torMode ? '#bf5af2' : 'var(--text-3)'} /> 
+                {settings.torMode ? 'Tor Active' : 'Tor Off'}
+              </span>
+              <div
+                className={`toggle ${settings.torMode ? 'on' : ''}`}
+                onClick={async () => {
+                  const el = document.getElementById('nt-tor-loading');
+                  if (el) el.style.opacity = '1';
+                  try {
+                    await onToggleSetting('torMode');
+                  } finally {
+                    if (el) el.style.opacity = '0';
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
 
-      {/* Tor Toggle - Top Left */}
-      {settings && onToggleSetting && (
-        <div style={{ position: 'absolute', top: 24, left: 24, zIndex: 20, display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="nt-tor-toggle">
-            <span className="nt-tor-label">
-              <OnionIcon size={14} color={settings.torMode ? '#bf5af2' : 'var(--text-3)'} /> 
-              {settings.torMode ? 'Tor Active' : 'Tor Off'}
-            </span>
-            <div
-              className={`toggle ${settings.torMode ? 'on' : ''}`}
-              onClick={async () => {
-                const el = document.getElementById('nt-tor-loading');
-                if (el) el.style.opacity = '1';
-                try {
-                  await onToggleSetting('torMode');
-                } finally {
-                  if (el) el.style.opacity = '0';
-                }
-              }}
-            />
-          </div>
-          <div id="nt-tor-loading" style={{ opacity: 0, fontSize: '11px', color: 'var(--text-3)', fontWeight: 500, transition: 'opacity 0.2s', whiteSpace: 'nowrap' }}>
-            {!settings.torMode ? 'Connecting...' : 'Disconnecting...'}
-          </div>
-        </div>
-      )}
+        {/* Settings Toggle */}
+        <button 
+          className="nt-settings-btn" 
+          style={{ position: 'static' }}
+          onClick={() => setShowSettings(!showSettings)}
+          title="Customize Homepage"
+        >
+          <ImageIcon size={16} />
+        </button>
+      </div>
 
       {/* Settings Panel */}
       {showSettings && (
@@ -236,7 +246,7 @@ export default function NewTab({
         {config.showClock && (
           <div className="nt-time-container">
             <h1 className="nt-clock">{time}</h1>
-            <p className="nt-date">{date}</p>
+            <p className="nt-date">{greeting} · {date}</p>
           </div>
         )}
 
@@ -284,6 +294,33 @@ export default function NewTab({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recently Visited */}
+        {recentHistory && recentHistory.length > 0 && (
+          <div className="nt-bookmarks-section">
+            <h3>Recently Visited</h3>
+            <div className="nt-bookmarks-grid">
+              {recentHistory
+                .filter((h, i, arr) => arr.findIndex(x => x.url === h.url) === i)
+                .slice(0, 4)
+                .map((h, i) => {
+                  let domain = h.url;
+                  try { domain = new URL(h.url).hostname; } catch {}
+                  return (
+                    <div key={i} className="nt-bookmark-card" onClick={() => onNavigate(h.url)}>
+                      <div className="nt-bookmark-icon">
+                        <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} alt="" style={{ width: 20, height: 20 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = (h.title || domain).charAt(0).toUpperCase(); }} />
+                      </div>
+                      <div className="nt-bookmark-info">
+                        <span className="nt-bookmark-title">{h.title || domain}</span>
+                        <span className="nt-bookmark-url">{domain}</span>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

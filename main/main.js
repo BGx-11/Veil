@@ -16,6 +16,10 @@ app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization,VaapiVideoDecoder');
+// ── Additional Security ──
+app.commandLine.appendSwitch('disable-remote-fonts'); // Prevent font-based tracking
+app.commandLine.appendSwitch('disable-background-networking'); // Prevent background network leaks
+app.commandLine.appendSwitch('no-pings'); // Block hyperlink auditing pings
 
 let mainWindow;
 let blockerInstance = null;
@@ -51,6 +55,12 @@ async function createWindow() {
   // ── Selective Permission Handler ──
   const allowedPermissions = ['fullscreen', 'media', 'pointerLock', 'pictureInPicture'];
   secureSession.setPermissionRequestHandler((_wc, permission, cb) => {
+    // Block dangerous permissions: geolocation, notifications, midi, etc.
+    const blocked = ['geolocation', 'notifications', 'midi', 'midiSysex', 'idle-detection', 'display-capture', 'clipboard-read', 'clipboard-sanitized-write'];
+    if (blocked.includes(permission)) {
+      console.log(`[Sec] Blocked permission request: ${permission}`);
+      return cb(false);
+    }
     cb(allowedPermissions.includes(permission));
   });
   secureSession.setPermissionCheckHandler((_wc, permission) => {
@@ -73,17 +83,39 @@ async function createWindow() {
       return callback({ redirectURL: upgraded });
     }
 
+    // ── Block known tracking/fingerprint domains ──
+    const trackingDomains = [
+      'google-analytics.com', 'googletagmanager.com',
+      'facebook.net', 'facebook.com/tr',
+      'doubleclick.net', 'googlesyndication.com',
+      'hotjar.com', 'fullstory.com', 'clarity.ms',
+      'segment.io', 'segment.com',
+      'mixpanel.com', 'amplitude.com',
+      'newrelic.com', 'nr-data.net',
+      'sentry.io', 'bugsnag.com',
+    ];
+
     try {
       if (details.url && !details.url.startsWith('browser://') && !details.url.startsWith('search://')) {
         const urlObj = new URL(details.url);
         const host = urlObj.hostname;
+        
+        // Check custom blocklist
         if (customBlocklist.some(blocked => host === blocked || host.endsWith('.' + blocked))) {
-          // Send event to UI that a request was blocked
           if (mainWindow) {
-            mainWindow.webContents.send('tracker-blocked', trackerCount + 1); // visually increment
+            mainWindow.webContents.send('tracker-blocked', trackerCount + 1);
           }
           trackerCount++;
           return callback({ cancel: true });
+        }
+
+        // Check known tracking domains (for non-main-frame requests only to avoid breaking navigation)
+        if (details.resourceType !== 'mainFrame' && appSettings.adBlocker !== false) {
+          if (trackingDomains.some(td => host === td || host.endsWith('.' + td))) {
+            trackerCount++;
+            if (mainWindow) mainWindow.webContents.send('tracker-blocked', trackerCount);
+            return callback({ cancel: true });
+          }
         }
       }
     } catch (e) {}
@@ -116,8 +148,9 @@ async function createWindow() {
       details.requestHeaders['Upgrade-Insecure-Requests'] = '1';
     }
 
-    // REMOVED: X-Forwarded-For and Client-IP headers.
-    // Injecting random IP headers triggers strict bot-protection on YouTube and Cloudflare!
+    // Sanitize potentially leaky headers
+    delete details.requestHeaders['X-Client-Data']; // Chrome telemetry header
+    delete details.requestHeaders['X-Chrome-Connected']; // Chrome sync header
 
     callback({ cancel: false, requestHeaders: details.requestHeaders });
   });
@@ -156,12 +189,14 @@ async function createWindow() {
       headers['Referrer-Policy'] = ['no-referrer'];
       headers['Permissions-Policy'] = [
         'camera=(), microphone=(), geolocation=(), payment=(), usb=(), ' +
-        'magnetometer=(), gyroscope=(), accelerometer=()'
+        'magnetometer=(), gyroscope=(), accelerometer=(), ' +
+        'bluetooth=(), serial=(), hid=(), idle-detection=()'
       ];
     } else {
       // For external sites, just force some basic protections without breaking functionality
       headers['X-XSS-Protection'] = ['1; mode=block'];
       headers['Referrer-Policy'] = ['strict-origin-when-cross-origin'];
+      headers['X-Content-Type-Options'] = ['nosniff'];
       
       // We do NOT inject X-Frame-Options: SAMEORIGIN here, because it breaks 
       // embedded Vimeo/YouTube players on external sites.
@@ -187,11 +222,17 @@ async function createWindow() {
       receivedBytes: item.getReceivedBytes(),
       state: item.getState(),
       savePath: item.getSavePath(),
+      startTime: Date.now(),
+      isPaused: false,
     };
     downloads.unshift(dl); // Add to top
 
+    // Store electron download item reference for pause/resume/cancel
+    dl._item = item;
+
     const notify = () => {
-      if (mainWindow) mainWindow.webContents.send('download-updated', dl);
+      const { _item, ...safeDl } = dl;
+      if (mainWindow) mainWindow.webContents.send('download-updated', safeDl);
     };
     notify();
 
@@ -199,12 +240,14 @@ async function createWindow() {
       dl.state = state;
       dl.receivedBytes = item.getReceivedBytes();
       dl.savePath = item.getSavePath() || dl.savePath;
+      dl.isPaused = item.isPaused();
       notify();
     });
 
     item.on('done', (event, state) => {
       dl.state = state;
       dl.savePath = item.getSavePath() || dl.savePath;
+      dl.isPaused = false;
       notify();
     });
   });
@@ -251,7 +294,7 @@ app.on('web-contents-created', (event, contents) => {
 });
 
 // ── IPC ──
-let appSettings = { httpsOnly: false };
+let appSettings = { httpsOnly: false, adBlocker: true };
 ipcMain.on('update-settings', (event, newSettings) => {
   appSettings = { ...appSettings, ...newSettings };
 });
@@ -270,6 +313,11 @@ ipcMain.on('win-maximize', () => {
   else mainWindow?.maximize();
 });
 ipcMain.on('win-close', () => mainWindow?.close());
+ipcMain.on('win-fullscreen', () => {
+  if (mainWindow) {
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  }
+});
 
 ipcMain.on('show-context-menu', (event, params) => {
   const template = [
@@ -280,10 +328,12 @@ ipcMain.on('show-context-menu', (event, params) => {
   ];
 
   if (params.linkURL) {
+    template.push({ label: 'Open Link in New Tab', click: () => mainWindow?.webContents.send('new-tab-requested', params.linkURL) });
     template.push({ label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) });
   }
   if (params.hasImageContents) {
     template.push({ label: 'Copy Image', click: () => mainWindow?.webContents.send('context-action', { action: 'copy-image', src: params.srcURL }) });
+    template.push({ label: 'Open Image in New Tab', click: () => mainWindow?.webContents.send('new-tab-requested', params.srcURL) });
   }
   if (params.isEditable) {
     template.push({ role: 'undo' });
@@ -296,15 +346,58 @@ ipcMain.on('show-context-menu', (event, params) => {
   } else {
     template.push({ role: 'copy', enabled: !!params.selectionText });
   }
+  
+  if (params.selectionText) {
+    template.push({ type: 'separator' });
+    template.push({ 
+      label: `Search for "${params.selectionText.substring(0, 30)}${params.selectionText.length > 30 ? '…' : ''}"`, 
+      click: () => mainWindow?.webContents.send('new-tab-requested', `search://${encodeURIComponent(params.selectionText)}`) 
+    });
+  }
 
   const menu = Menu.buildFromTemplate(template);
   menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
 });
 
-ipcMain.handle('get-downloads', () => downloads);
+ipcMain.handle('get-downloads', () => {
+  return downloads.map(({ _item, ...rest }) => rest);
+});
 ipcMain.handle('open-file', async (event, filePath) => {
   const { shell } = require('electron');
   return await shell.openPath(filePath);
+});
+
+// Download control
+ipcMain.handle('pause-download', (event, id) => {
+  const dl = downloads.find(d => d.id === id);
+  if (dl && dl._item && dl.state === 'progressing') {
+    dl._item.pause();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('resume-download', (event, id) => {
+  const dl = downloads.find(d => d.id === id);
+  if (dl && dl._item && dl._item.canResume()) {
+    dl._item.resume();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('cancel-download', (event, id) => {
+  const dl = downloads.find(d => d.id === id);
+  if (dl && dl._item) {
+    dl._item.cancel();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('clear-completed-downloads', () => {
+  downloads = downloads.filter(d => d.state === 'progressing');
+  return true;
 });
 
 ipcMain.handle('get-tracker-count', () => trackerCount);

@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   winMinimize: () => ipcRenderer.send('win-minimize'),
   winMaximize: () => ipcRenderer.send('win-maximize'),
   winClose:    () => ipcRenderer.send('win-close'),
+  winFullscreen: () => ipcRenderer.send('win-fullscreen'),
 
   // Context Menu
   showContextMenu: (params) => ipcRenderer.send('show-context-menu', params),
@@ -22,6 +23,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Downloads
   getDownloads: () => ipcRenderer.invoke('get-downloads'),
   openFile: (path) => ipcRenderer.invoke('open-file', path),
+  pauseDownload: (id) => ipcRenderer.invoke('pause-download', id),
+  resumeDownload: (id) => ipcRenderer.invoke('resume-download', id),
+  cancelDownload: (id) => ipcRenderer.invoke('cancel-download', id),
+  clearCompletedDownloads: () => ipcRenderer.invoke('clear-completed-downloads'),
   onDownloadUpdated: (cb) => {
     ipcRenderer.removeAllListeners('download-updated');
     ipcRenderer.on('download-updated', (_e, dl) => cb(dl));
