@@ -15,8 +15,18 @@
 # Build outputs
 /.next/
 /out/
-/build
+/build/
 /dist/
+/release/
+/android/
+/ios/
+
+# Archives
+*.zip
+*.7z
+*.tar.gz
+*.rar
+!Veil_Setup_v1.zip
 
 # Electron Builder
 *.exe
