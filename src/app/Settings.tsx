@@ -14,6 +14,7 @@ const sections = [
     title: 'Privacy & Tracking',
     icon: <Shield size={18} color="var(--accent)" />,
     items: [
+      { key: 'normalMode', label: 'Normal Browsing Mode', desc: 'Allows persistent cookies and sessions for sites like YouTube (requires restart)' },
       { key: 'adBlocker', label: 'Ad & Tracker Blocker', desc: 'Blocks ads, trackers, and malware domains (Ghostery engine)' },
       { key: 'stripReferer', label: 'Strip Referer Headers', desc: 'Prevents sites from knowing which page you came from' },
       { key: 'blockCookies', label: 'Block 3rd-Party Cookies', desc: 'Prevents cross-site tracking via cookies' },
