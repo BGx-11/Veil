@@ -1,6 +1,8 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ═══════════════════════════════════════════════════
+# Veil Browser .gitignore
+# ═══════════════════════════════════════════════════
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,32 +12,60 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# Build outputs
 /.next/
 /out/
-
-# production
 /build
+/dist/
 
-# misc
+# Electron Builder
+*.exe
+*.dmg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.msi
+*.blockmap
+*.yml
+!electron-builder.yml
+
+# Tor binaries (downloaded via postinstall)
+/bin/tor/
+
+# Testing
+/coverage
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS files
 .DS_Store
-*.pem
+Thumbs.db
+Desktop.ini
+ehthumbs.db
 
-# debug
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Misc
+*.pem
+.vercel
+scratch.js
+test-*.js
