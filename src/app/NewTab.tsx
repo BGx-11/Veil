@@ -39,6 +39,7 @@ export default function NewTab({
     bgUrl: '',
     showClock: true,
     showShortcuts: true,
+    showRecent: true,
     blurInner: true,
     shortcuts: DEFAULT_SHORTCUTS
   });
@@ -159,7 +160,7 @@ export default function NewTab({
                 {settings.torMode ? 'Tor Active' : 'Tor Off'}
               </span>
               <div
-                className={`toggle ${settings.torMode ? 'on' : ''}`}
+                className={`nt-tor-switch ${settings.torMode ? 'on' : ''}`}
                 onClick={async () => {
                   const el = document.getElementById('nt-tor-loading');
                   if (el) el.style.opacity = '1';
@@ -169,7 +170,9 @@ export default function NewTab({
                     if (el) el.style.opacity = '0';
                   }
                 }}
-              />
+              >
+                <div className="nt-tor-knob" />
+              </div>
             </div>
           </div>
         )}
@@ -211,6 +214,10 @@ export default function NewTab({
             <label>
               <input type="checkbox" checked={config.showShortcuts} onChange={(e) => updateConfig('showShortcuts', e.target.checked)} />
               <LayoutGrid size={14} /> Show Shortcuts
+            </label>
+            <label>
+              <input type="checkbox" checked={config.showRecent} onChange={(e) => updateConfig('showRecent', e.target.checked)} />
+              <Clock size={14} /> Show Recent Sites
             </label>
             <label style={{ opacity: validBgUrl ? 1 : 0.5 }}>
               <input type="checkbox" checked={config.blurInner} onChange={(e) => updateConfig('blurInner', e.target.checked)} disabled={!validBgUrl} />
@@ -268,14 +275,21 @@ export default function NewTab({
 
         {config.showShortcuts && (
           <div className="nt-shortcuts-grid">
-            {config.shortcuts.map((s: any, idx: number) => (
-              <div key={idx} className="nt-tile" onClick={() => onNavigate(s.url)}>
-                <div className="nt-tile-icon" style={{ background: 'var(--surface-hover)' }}>
-                  <img src={`https://www.google.com/s2/favicons?domain=${new URL(s.url).hostname}&sz=64`} alt="" style={{ width: 32, height: 32, borderRadius: 8 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = s.letter; }} />
+            {config.shortcuts.map((s: any, idx: number) => {
+              let domain = s.url;
+              try { domain = new URL(s.url).hostname; } catch {}
+              return (
+                <div key={idx} className="nt-tile" onClick={() => onNavigate(s.url)}>
+                  <div className="nt-tile-icon" style={{ background: 'var(--surface-hover)', position: 'relative' }}>
+                    <div className="nt-tile-letter" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '20px', color: s.color || 'var(--text-1)' }}>
+                      {s.letter || s.label.charAt(0).toUpperCase()}
+                    </div>
+                    <img src={`https://icon.horse/icon/${domain}`} alt="" style={{ width: 32, height: 32, borderRadius: 8, position: 'relative', zIndex: 1, objectFit: 'contain' }} onError={(e) => { e.currentTarget.style.opacity = '0'; }} />
+                  </div>
+                  <span className="nt-tile-label">{s.label}</span>
                 </div>
-                <span className="nt-tile-label">{s.label}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -283,23 +297,30 @@ export default function NewTab({
           <div className="nt-bookmarks-section">
             <h3>Bookmarks</h3>
             <div className="nt-bookmarks-grid">
-              {settings.bookmarks.map((b: any, i: number) => (
-                <div key={i} className="nt-bookmark-card" onClick={() => onNavigate(b.url)}>
-                  <div className="nt-bookmark-icon">
-                    <img src={`https://www.google.com/s2/favicons?domain=${new URL(b.url).hostname}&sz=32`} alt="" style={{ width: 20, height: 20 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = b.title ? b.title.charAt(0).toUpperCase() : '?'; }} />
+              {settings.bookmarks.map((b: any, i: number) => {
+                let domain = b.url;
+                try { domain = new URL(b.url).hostname; } catch {}
+                return (
+                  <div key={i} className="nt-bookmark-card" onClick={() => onNavigate(b.url)}>
+                    <div className="nt-bookmark-icon" style={{ position: 'relative' }}>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                        {b.title ? b.title.charAt(0).toUpperCase() : domain.charAt(0).toUpperCase()}
+                      </div>
+                      <img src={`https://icon.horse/icon/${domain}`} alt="" style={{ width: 20, height: 20, position: 'relative', zIndex: 1 }} onError={(e) => { e.currentTarget.style.opacity = '0'; }} />
+                    </div>
+                    <div className="nt-bookmark-info">
+                      <span className="nt-bookmark-title">{b.title || b.url}</span>
+                      <span className="nt-bookmark-url">{domain}</span>
+                    </div>
                   </div>
-                  <div className="nt-bookmark-info">
-                    <span className="nt-bookmark-title">{b.title || b.url}</span>
-                    <span className="nt-bookmark-url">{b.url}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Recently Visited */}
-        {recentHistory && recentHistory.length > 0 && (
+        {config.showRecent !== false && recentHistory && recentHistory.length > 0 && (
           <div className="nt-bookmarks-section">
             <h3>Recently Visited</h3>
             <div className="nt-bookmarks-grid">
@@ -311,8 +332,11 @@ export default function NewTab({
                   try { domain = new URL(h.url).hostname; } catch {}
                   return (
                     <div key={i} className="nt-bookmark-card" onClick={() => onNavigate(h.url)}>
-                      <div className="nt-bookmark-icon">
-                        <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} alt="" style={{ width: 20, height: 20 }} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerText = (h.title || domain).charAt(0).toUpperCase(); }} />
+                      <div className="nt-bookmark-icon" style={{ position: 'relative' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                          {(h.title || domain).charAt(0).toUpperCase()}
+                        </div>
+                        <img src={`https://icon.horse/icon/${domain}`} alt="" style={{ width: 20, height: 20, position: 'relative', zIndex: 1 }} onError={(e) => { e.currentTarget.style.opacity = '0'; }} />
                       </div>
                       <div className="nt-bookmark-info">
                         <span className="nt-bookmark-title">{h.title || domain}</span>
