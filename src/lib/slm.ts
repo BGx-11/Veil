@@ -1,9 +1,8 @@
 import { pipeline, env } from '@huggingface/transformers';
 
-env.allowLocalModels = true;
+env.allowLocalModels = false;
 env.allowRemoteModels = true;
 // @ts-ignore
-env.localModelPath = '/models/';
 env.useBrowserCache = false;
 // @ts-ignore
 env.backends.onnx.wasm.wasmPaths = '/wasm/';
@@ -17,7 +16,7 @@ export async function getSLMPipeline(progressCallback?: (data: any) => void) {
   }
   
   if (!_generatorPromise) {
-    _generatorPromise = pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
+    _generatorPromise = pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
       device: 'webgpu',
       dtype: 'q4f16',
       progress_callback: (data: any) => {

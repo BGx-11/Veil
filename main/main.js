@@ -274,9 +274,9 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
+    mainWindow.loadURL('http://localhost:3000/browser');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../out/browser.html'));
   }
 
   mainWindow.on('closed', () => { mainWindow = null; });

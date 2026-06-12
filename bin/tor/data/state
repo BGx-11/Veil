@@ -1,4 +1,4 @@
-# Tor state file last generated on 2026-05-31 22:56:16 local time
+# Tor state file last generated on 2026-06-12 12:16:43 local time
 # Other times below are in UTC
 # You *do not* need to edit this file.
 
@@ -187,7 +187,7 @@ Guard in=default rsa_id=4EF3608AB9D6574ED762DA74B7E63A203C542C49 nickname=willie
 Guard in=default rsa_id=BF9EB7BC5BB039A6FC7F5A0CC124061BB1B8D2D1 nickname=as215248node3 sampled_on=2026-05-20T17:38:27 sampled_idx=2 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=4CEAFCE5841C0DAE30164B4F59452F7F4D818A67 nickname=QOnan sampled_on=2026-05-29T12:39:55 sampled_idx=3 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=581F1F9C88643844B8DE347DD52826CF4359D0E5 nickname=diddy sampled_on=2026-05-20T01:20:21 sampled_idx=4 sampled_by=0.4.8.11 listed=1
-Guard in=default rsa_id=E762EF5F57C87C25154937426A0E7574AFDDB667 nickname=TheShadowRoute07 sampled_on=2026-05-28T02:05:04 sampled_idx=5 sampled_by=0.4.8.11 listed=1
+Guard in=default rsa_id=E762EF5F57C87C25154937426A0E7574AFDDB667 nickname=TheShadowRoute07 sampled_on=2026-05-28T02:05:04 sampled_idx=5 sampled_by=0.4.8.11 unlisted_since=2026-06-08T10:17:22 listed=0
 Guard in=default rsa_id=B6F6A56C5DB1CFB18692695923B3E429758C9A3A nickname=Anguiped sampled_on=2026-05-28T13:27:15 sampled_idx=6 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=CF2C63AF47595B96CCF5CFC23C8C95826F9B9B53 nickname=Boquerones sampled_on=2026-05-18T22:37:44 sampled_idx=7 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=4956116E43354D2A832129A543C011EEE28A8789 nickname=YahooSucks sampled_on=2026-05-26T04:00:32 sampled_idx=8 sampled_by=0.4.8.11 listed=1
@@ -202,6 +202,7 @@ Guard in=default rsa_id=E52A6796CFC28A793521963505C0C5C5CA3FFA4A nickname=LOLlol
 Guard in=default rsa_id=2CFFDEAEA997E741A7E850CDC9F1E9815DC36759 nickname=Computer0111 sampled_on=2026-05-21T11:37:58 sampled_idx=17 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=5DB9AE27A44EB7B476CC04A66C67A71C97A001E6 nickname=Chenjesu sampled_on=2026-05-22T06:57:03 sampled_idx=18 sampled_by=0.4.8.11 listed=1
 Guard in=default rsa_id=8FEEA738BFC24D0F93AE5833575D52A6F0433F29 nickname=mchammer sampled_on=2026-05-30T16:26:56 sampled_idx=19 sampled_by=0.4.8.11 listed=1
-LastWritten 2026-05-31 17:26:16
+Guard in=default rsa_id=BE376A38E3544BD46702A0813D1C20F1CA0F2774 nickname=forest32 sampled_on=2026-06-01T18:00:46 sampled_idx=20 sampled_by=0.4.8.11 listed=1
+LastWritten 2026-06-12 06:46:43
 TorVersion Tor 0.4.8.11 (git-cc3037ba77f6c0e4)
 TotalBuildTimes 581
