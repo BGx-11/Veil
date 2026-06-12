@@ -61,46 +61,54 @@
 }
 
 [data-theme='light'] {
-  --bg-deep: #eef1f6;
-  --bg: #f8fafc;
+  --bg-deep: #f8fafc;
+  --bg: #ffffff;
   --bg-raised: #ffffff;
   --bg-elevated: #ffffff;
   
-  --glass-bg: rgba(248, 250, 252, 0.75);
-  --glass-border: rgba(0, 0, 0, 0.06);
-  --glass-highlight: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.4) 100%);
-  --modal-overlay: rgba(15, 23, 42, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-highlight: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(248,250,252,0.8) 100%);
+  --modal-overlay: rgba(15, 23, 42, 0.6);
   
-  --surface: rgba(0, 0, 0, 0.04);
-  --surface-hover: rgba(0, 0, 0, 0.08);
-  --surface-active: rgba(0, 0, 0, 0.12);
+  --surface: rgba(37, 99, 235, 0.04);
+  --surface-hover: rgba(37, 99, 235, 0.08);
+  --surface-active: rgba(37, 99, 235, 0.12);
   
-  --border: rgba(0, 0, 0, 0.08);
-  --border-hover: rgba(0, 0, 0, 0.15);
+  --border: rgba(15, 23, 42, 0.1);
+  --border-hover: rgba(15, 23, 42, 0.2);
   
-  --text-1: #0f172a;
-  --text-2: #334155;
-  --text-3: #64748b;
-  --text-4: #94a3b8;
+  --text-1: #020617;
+  --text-2: #1e293b;
+  --text-3: #475569;
+  --text-4: #64748b;
   
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
-  --accent-glow: rgba(37, 99, 235, 0.25);
-  --accent-dim: rgba(37, 99, 235, 0.1);
-  --accent-surface: rgba(37, 99, 235, 0.15);
+  --accent-glow: rgba(37, 99, 235, 0.4);
+  --accent-dim: rgba(37, 99, 235, 0.15);
+  --accent-surface: rgba(37, 99, 235, 0.2);
   
   --purple: #9333ea;
-  --purple-dim: rgba(147, 51, 234, 0.12);
-  --green: #16a34a;
-  --green-dim: rgba(22, 163, 74, 0.12);
+  --purple-dim: rgba(147, 51, 234, 0.15);
+  --green: #059669;
+  --green-dim: rgba(5, 150, 105, 0.15);
   --red: #dc2626;
   --orange: #ea580c;
   --cyan: #0891b2;
   
-  --shadow: 0 16px 48px rgba(15, 23, 42, 0.1);
-  --shadow-sm: 0 4px 16px rgba(15, 23, 42, 0.06);
-  --shadow-glow: 0 0 0 1px rgba(0,0,0,0.05), 0 8px 32px rgba(37,99,235,0.15);
+  --shadow: 0 12px 32px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.04);
+
+  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-glow: 0 0 0 1px rgba(15, 23, 42, 0.10), 0 8px 24px rgba(15, 23, 42, 0.12);
 }
+
+[data-theme='light'] .nt-clock { color: var(--text-1) !important; text-shadow: none !important; -webkit-text-fill-color: initial !important; background: none !important; }
+[data-theme='light'] .nt-time-container p { color: var(--text-3) !important; }
+[data-theme='light'] .nt-tor-label { color: var(--text-3) !important; }
+[data-theme='light'] .nt-settings-btn { color: var(--text-1) !important; background: rgba(0,0,0,0.05); }
+[data-theme='light'] .nt-settings-panel { background: rgba(255, 255, 255, 0.95); border-color: rgba(0,0,0,0.1); }
+[data-theme='light'] .nt-main-content.frosted { background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.1); }
 
 /* ═══════════════════════════════════════════════════
    RESET & BASE
@@ -113,6 +121,18 @@ html, body {
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;
 }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[data-theme='light'] .nt-tor-toggle {
+  background: var(--surface-hover);
+  color: var(--text-1) !important;
+}
+[data-theme='light'] .nt-tor-toggle span {
+  color: var(--text-1) !important;
+}
+
 button { font-family:inherit; cursor:pointer; border:none; background:none; color:inherit; }
 input { font-family:inherit; }
 
@@ -556,9 +576,12 @@ body, .shell, .titlebar, .toolbar, .sidebar, .content,
   position: absolute; top: 74px; right: 24px; z-index: 30;
   width: 320px; background: rgba(15, 15, 18, 0.85);
   backdrop-filter: blur(25px) saturate(200%);
+  -webkit-backdrop-filter: blur(25px) saturate(200%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl); padding: 20px;
   box-shadow: var(--shadow); animation: fadeUp 0.3s cubic-bezier(0.16,1,0.3,1);
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 .nt-settings-header { display: flex; justify-content: space-between; margin-bottom: 16px; font-weight: 600; font-size: 14px; }
 .nt-settings-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -672,6 +695,31 @@ body, .shell, .titlebar, .toolbar, .sidebar, .content,
   display: flex; align-items: center; justify-content: center; gap: 6px;
   font-size: 11px; font-weight: 700; color: var(--text-2);
   text-transform: uppercase; letter-spacing: 1px;
+}
+.nt-tor-switch {
+  position: relative; width: 44px; height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+}
+.nt-tor-switch:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.nt-tor-switch.on {
+  background: #bf5af2;
+  box-shadow: 0 0 16px rgba(191, 90, 242, 0.4), inset 0 2px 4px rgba(0,0,0,0.1);
+}
+.nt-tor-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  background: #fff; border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.nt-tor-switch.on .nt-tor-knob {
+  transform: translateX(20px);
 }
 
 /* ═══════════════════════════════════════════════════
@@ -1059,29 +1107,29 @@ body, .shell, .titlebar, .toolbar, .sidebar, .content,
 
 .slm-input-area {
   padding: 20px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border);
   display: flex;
   gap: 12px;
-  background: rgba(0,0,0,0.2);
+  background: var(--bg-raised);
 }
 
 .slm-input-area input {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
   padding: 14px 20px;
   border-radius: 24px;
   color: var(--text-1);
   font-size: 14px;
   outline: none;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .slm-input-area input:focus {
   border-color: rgba(191, 90, 242, 0.5);
-  box-shadow: 0 0 0 4px rgba(191, 90, 242, 0.15), inset 0 2px 4px rgba(0,0,0,0.2);
-  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 4px rgba(191, 90, 242, 0.15), inset 0 2px 4px rgba(0,0,0,0.05);
+  background: var(--surface-active);
   transform: translateY(-1px);
 }
 
