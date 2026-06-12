@@ -283,11 +283,11 @@ export default function LandingPage() {
             
             <div className="lp-modal-actions">
               <a 
-                href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Setup_v1.exe" 
+                href="https://github.com/BGx-11/Veil/raw/main/Veil_Setup_v1.zip" 
                 className="lp-btn lp-btn--primary"
                 style={{ width: '100%', justifyContent: 'center' }}
               >
-                Download .exe (Windows)
+                Download .zip (Windows)
               </a>
               <div className="lp-modal-note">
                 <Shield size={14} /> Open source and free forever.
