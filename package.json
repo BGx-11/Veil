@@ -17,6 +17,30 @@
     "cap:open": "cap open android",
     "postinstall": "node scripts/download-tor.js"
   },
+  "build": {
+    "appId": "com.veil.browser",
+    "productName": "Veil Browser",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main/**/*",
+      "public/**/*",
+      "bin/**/*",
+      "package.json",
+      "node_modules/**/*",
+      ".next/**/*",
+      "!.next/cache/**/*",
+      "!out/**/*",
+      "!dist/**/*",
+      "!release/**/*",
+      "!.git/**/*",
+      "!android/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  },
   "dependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/core": "^8.3.4",
