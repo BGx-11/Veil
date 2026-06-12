@@ -2,9 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Shield, Moon, Sun, Plus, X, ArrowLeft, ArrowRight, RotateCw, Home,
-  Minus, Square, Search, Lock, Globe, Settings as SettingsIcon, PanelLeft, Star, Volume2, Languages, Bot, Video, Mic, Download,
-  BookOpen, Clock, Pin, Columns2, Maximize, MoreVertical
+  Shield, Plus, X, ArrowLeft, ArrowRight, RotateCw, Home, Lock, Unlock, Settings as SettingsIcon, LayoutDashboard, Globe, List, Monitor, Maximize, Minus, Square, PanelLeft, EyeOff, Check, XCircle, Mic, Video, VolumeX, Eye, Search, Volume2, Languages, Bot, Download, BookOpen, Clock, Pin, Columns2, MoreVertical, Star, Sun, Moon
 } from 'lucide-react';
 
 const OnionIcon = ({ size = 24, color = "currentColor" }: { size?: number; color?: string }) => (
@@ -126,6 +124,7 @@ export default function BrowserShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [slmOpen, setSlmOpen] = useState(false);
+  const [slmContext, setSlmContext] = useState<string>('');
   const [shieldOpen, setShieldOpen] = useState(false);
   const [translateOpen, setTranslateOpen] = useState(false);
   const [translateTarget, setTranslateTarget] = useState('en');
@@ -182,6 +181,7 @@ export default function BrowserShell() {
     torMode: false,
     httpsOnly: false,
     darkMode: true,
+    normalMode: false,
     bookmarks: [] as {url: string, title: string}[],
     blocklist: [] as string[]
   });
@@ -696,6 +696,21 @@ export default function BrowserShell() {
     activeWebviewRef.current = active ? wvRefs.current[active.id] : null;
   }, [activeId, tabs]);
 
+  useEffect(() => {
+    if (slmOpen && active && !isInternal(active.url)) {
+      const wv = wvRefs.current[active.id];
+      if (wv) {
+        wv.executeJavaScript('document.body.innerText').then((text: string) => {
+           setSlmContext(`URL: ${active.url}\nTitle: ${active.title}\nPage Content:\n${text.substring(0, 5000)}`);
+        }).catch(() => {
+           setSlmContext(`URL: ${active.url}\nTitle: ${active.title}`);
+        });
+      }
+    } else if (active && isInternal(active.url)) {
+      setSlmContext(`Internal Page: ${active.url}`);
+    }
+  }, [slmOpen, active]);
+
   return (
     <div className="shell">
       {/* ── TITLE BAR ── */}
@@ -728,6 +743,18 @@ export default function BrowserShell() {
             if (!shieldOpen) fetchIpInfo();
           }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}>
             <Lock size={14} color={settings.torMode ? 'var(--green)' : 'var(--text-3)'} />
+          </button>
+          
+          <button type="button" className="url-lock" onClick={(e) => {
+            e.stopPropagation();
+            setSettings(s => {
+              const newVal = !s.normalMode;
+              if (api && api.updateSettings) api.updateSettings({ normalMode: newVal });
+              return { ...s, normalMode: newVal };
+            });
+            showToast(settings.normalMode ? 'Normal Mode Disabled (Privacy ON)' : 'Normal Mode Enabled', 'info');
+          }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 8px', display: 'flex', alignItems: 'center', color: settings.normalMode ? 'var(--accent)' : 'var(--text-3)' }} title="Toggle Normal Mode">
+            {settings.normalMode ? <Unlock size={14} /> : <Shield size={14} />}
           </button>
           
           <input ref={urlInputRef} className="url-input" type="text" placeholder="Search or enter address" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} onFocus={(e) => e.target.select()} />
@@ -993,7 +1020,7 @@ export default function BrowserShell() {
                     ref={(el) => { if (el) wvRefs.current[tab.id] = el; }}
                     src={tab.url}
                     preload={preloadPath}
-                    partition="in-memory"
+                    partition={settings.normalMode && !settings.torMode ? "persist:default" : "in-memory"}
                     style={{ width: '100%', height: '100%', border: 'none', display: tab.error || tab.readerMode ? 'none' : 'flex' }}
                     allowpopups={"true" as any}
                   />
@@ -1080,7 +1107,7 @@ export default function BrowserShell() {
           />
         )}
 
-        <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} />
+        <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} currentContext={slmContext} />
 
         {isSettingsOpen && (
           <div className="settings-modal-overlay" onClick={() => setIsSettingsOpen(false)}>
