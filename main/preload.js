@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   toggleTor:      (enable) => ipcRenderer.invoke('toggle-tor', enable),
   getPreloadPath: ()       => ipcRenderer.sendSync('get-preload-path'),
-  performSearch:  (query)  => ipcRenderer.invoke('perform-search', query),
+  performSearch:  (query, type)  => ipcRenderer.invoke('perform-search', query, type),
   getTrackerCount: ()      => ipcRenderer.invoke('get-tracker-count'),
   updateBlocklist: (list)  => ipcRenderer.send('update-blocklist', list),
   updateSettings:  (s)     => ipcRenderer.send('update-settings', s),
