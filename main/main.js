@@ -20,6 +20,14 @@ app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization,VaapiVid
 app.commandLine.appendSwitch('disable-remote-fonts'); // Prevent font-based tracking
 app.commandLine.appendSwitch('disable-background-networking'); // Prevent background network leaks
 app.commandLine.appendSwitch('no-pings'); // Block hyperlink auditing pings
+app.commandLine.appendSwitch('enable-sandbox'); // Enforce strict sandbox
+app.commandLine.appendSwitch('disable-client-side-phishing-detection'); // Privacy: stop uploading URLs
+app.commandLine.appendSwitch('disable-component-update'); // Prevent background updating
+app.commandLine.appendSwitch('disable-sync'); // Stop all syncing
+app.commandLine.appendSwitch('disable-domain-reliability'); // Prevent google tracking
+app.commandLine.appendSwitch('disable-speech-api'); // Prevent microphone fingerprinting
+app.commandLine.appendSwitch('disable-plugins'); // Block flash/PDF/other plugins
+app.commandLine.appendSwitch('block-new-web-contents');
 
 let mainWindow;
 let blockerInstance = null;
@@ -30,8 +38,8 @@ const isDev = !app.isPackaged;
 
 async function createWindow() {
 
-  // ── In-memory session (NOTHING persists to disk, but caches in RAM for speed) ──
   const secureSession = session.fromPartition('in-memory');
+  const sessionsToSecure = [session.fromPartition('in-memory'), session.fromPartition('persist:default')];
 
   // ── Ghostery Ad/Tracker Blocker ──
   try {
@@ -41,8 +49,27 @@ async function createWindow() {
       read: fs.promises.readFile,
       write: fs.promises.writeFile
     });
-    blockerInstance.enableBlockingInSession(secureSession);
-    // Count blocked requests
+    
+    // Background fetch additional lists
+    ElectronBlocker.fromLists(fetch, [
+      'https://easylist.to/easylist/easylist.txt',
+      'https://easylist.to/easylist/easyprivacy.txt',
+      'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/filters.txt',
+      'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/privacy.txt',
+      'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt',
+      'https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext'
+    ], { path: enginePath, read: fs.promises.readFile, write: fs.promises.writeFile })
+      .then(nb => {
+        blockerInstance = nb;
+        sessionsToSecure.forEach(sess => {
+          try { blockerInstance.enableBlockingInSession(sess); } catch (e) {}
+        });
+        console.log('[Sec] Enhanced adblock lists loaded in background');
+      }).catch(console.error);
+
+    sessionsToSecure.forEach(sess => {
+      try { blockerInstance.enableBlockingInSession(sess); } catch (e) {}
+    });
     blockerInstance.on('request-blocked', () => {
       trackerCount++;
       if (mainWindow) mainWindow.webContents.send('tracker-blocked', trackerCount);
@@ -52,6 +79,7 @@ async function createWindow() {
     console.error('[Sec] AdBlocker failed:', err.message);
   }
 
+  sessionsToSecure.forEach(secureSession => {
   // ── Selective Permission Handler ──
   const allowedPermissions = ['fullscreen', 'media', 'pointerLock', 'pictureInPicture'];
   secureSession.setPermissionRequestHandler((_wc, permission, cb) => {
@@ -252,6 +280,8 @@ async function createWindow() {
     });
   });
 
+  }); // End sessionsToSecure.forEach
+
   // ── Window ──
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -267,7 +297,10 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true,
-      sandbox: false,
+      sandbox: true, // Hardened
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      navigateOnDragDrop: false,
     },
   });
 
@@ -294,9 +327,16 @@ app.on('web-contents-created', (event, contents) => {
 });
 
 // ── IPC ──
-let appSettings = { httpsOnly: false, adBlocker: true };
+let appSettings = { httpsOnly: false, adBlocker: true, normalMode: false };
+const configPath = path.join(app.getPath('userData'), 'veil-config.json');
+try {
+  if (fs.existsSync(configPath)) {
+    appSettings = { ...appSettings, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
+  }
+} catch(e) {}
 ipcMain.on('update-settings', (event, newSettings) => {
   appSettings = { ...appSettings, ...newSettings };
+  try { fs.writeFileSync(configPath, JSON.stringify(appSettings)); } catch(e) {}
 });
 
 ipcMain.on('get-preload-path', (event) => {
@@ -402,33 +442,148 @@ ipcMain.handle('clear-completed-downloads', () => {
 
 ipcMain.handle('get-tracker-count', () => trackerCount);
 
-ipcMain.handle('perform-search', async (_event, query) => {
+ipcMain.handle('perform-search', async (_event, query, type = 'All') => {
   try {
     const secureSession = session.fromPartition('in-memory');
     const { net } = require('electron');
+    
+    // Helper to fetch JSON from Wikipedia
+    const fetchWiki = (url) => new Promise((resolve) => {
+      const req = net.request({ method: 'GET', url, session: secureSession, useSessionCookies: false });
+      req.setHeader('User-Agent', 'Mozilla/5.0');
+      req.on('response', (res) => {
+        let d = ''; res.on('data', c => d+=c);
+        res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { resolve(null); } });
+      });
+      req.on('error', () => resolve(null));
+      req.end();
+    });
+
+    let results = [];
+
+    const fetchGoogle = (url) => new Promise((resolve) => {
+      const req = net.request({ method: 'GET', url, session: secureSession, useSessionCookies: false });
+      req.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      req.on('response', (res) => {
+        let html = ''; res.on('data', c => html+=c.toString());
+        res.on('end', () => resolve(html));
+      });
+      req.on('error', () => resolve(''));
+      req.end();
+    });
+
+    if (type === 'News') {
+      const xml = await fetchGoogle(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`);
+      const cheerio = require('cheerio');
+      const $ = cheerio.load(xml, { xmlMode: true });
+      $('item').each((i, el) => {
+        results.push({
+          url: $(el).find('link').text(),
+          title: $(el).find('title').text(),
+          description: $(el).find('pubDate').text() + ' - ' + $(el).find('source').text(),
+          displayUrl: $(el).find('source').text(),
+          isNews: true
+        });
+      });
+      return { success: true, results };
+    }
+
+    if (type === 'Images') {
+      const html = await fetchGoogle(`https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=isch`);
+      const matches = html.match(/<img[^>]+src="(https:\/\/encrypted-tbn0\.gstatic\.com\/images[^"]+)"/g);
+      if (matches) {
+        matches.forEach(m => {
+          const srcMatch = m.match(/src="([^">]+)"/);
+          if (srcMatch && srcMatch[1]) {
+            results.push({
+              url: srcMatch[1],
+              displayUrl: srcMatch[1],
+              title: query + ' image',
+              description: '',
+              isImage: true
+            });
+          }
+        });
+      }
+      return { success: true, results };
+    }
+
+    if (type === 'Videos') {
+      const html = await fetchGoogle(`https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=vid`);
+      const cheerio = require('cheerio');
+      const $ = cheerio.load(html);
+      $('a').each((i, el) => {
+        const href = $(el).attr('href') || '';
+        if (href.includes('/url?q=https://www.youtube.com/watch%3Fv%3D')) {
+           const vidMatch = href.match(/v%3D([^&]+)/);
+           if (vidMatch && vidMatch[1]) {
+             const title = $(el).find('div').first().text() || $(el).text() || 'YouTube Video';
+             if (title && title.length > 3 && !results.find(r => r.videoId === vidMatch[1])) {
+               results.push({
+                 url: `https://www.youtube.com/watch?v=${vidMatch[1]}`,
+                 displayUrl: 'youtube.com',
+                 title: title,
+                 description: '',
+                 isVideo: true,
+                 videoId: vidMatch[1]
+               });
+             }
+           }
+        }
+      });
+      if (results.length > 0) return { success: true, results };
+    }
+
+    if (type === 'Shopping') {
+      const html = await fetchGoogle(`https://www.google.com/search?q=${encodeURIComponent(query)}&tbm=shop`);
+      const cheerio = require('cheerio');
+      const $ = cheerio.load(html);
+      $('a').each((i, el) => {
+        const href = $(el).attr('href') || '';
+        if (href.startsWith('/url?q=')) {
+          const text = $(el).text().trim();
+          if (text.length > 10 && text.includes('$')) {
+            results.push({
+               url: decodeURIComponent(href.replace('/url?q=', '').split('&')[0]),
+               displayUrl: 'Google Shopping',
+               title: text.split('$')[0].trim(),
+               description: '$' + (text.split('$')[1] || '').split(' ')[0],
+               isShopping: true
+            });
+          }
+        }
+      });
+      const seen = new Set();
+      results = results.filter(r => {
+         if (seen.has(r.title)) return false;
+         seen.add(r.title); return true;
+      });
+      if (results.length > 0) return { success: true, results };
+    }
+
+    // Default DuckDuckGo HTML Search
+    let ddgQuery = query;
+    if (type !== 'All' && type !== 'Images') {
+      ddgQuery += ` ${type}`;
+    }
     return new Promise((resolve) => {
       const request = net.request({
         method: 'GET',
-        url: `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+        url: `https://html.duckduckgo.com/html/?q=${encodeURIComponent(ddgQuery)}`,
         session: secureSession,
         useSessionCookies: false
       });
-      request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      request.setHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8');
-      request.setHeader('Accept-Language', 'en-US,en;q=0.5');
-
+      request.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+      
       request.on('response', (response) => {
         let html = '';
         response.on('data', (chunk) => { html += chunk.toString(); });
-        response.on('end', () => {
+        response.on('end', async () => {
           try {
             const cheerio = require('cheerio');
             const $ = cheerio.load(html);
-            const results = [];
             
             $('.result').each((i, el) => {
-              if (results.length >= 10) return false;
-              
               const titleEl = $(el).find('.result__title .result__a');
               const snippetEl = $(el).find('.result__snippet');
               const urlEl = $(el).find('.result__url');
@@ -449,39 +604,9 @@ ipcMain.handle('perform-search', async (_event, query) => {
                 results.push({ url: link, displayUrl, title, description });
               }
             });
-            
-            if (results.length === 0) {
-              const wikiReq = net.request({
-                method: 'GET',
-                url: `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=5&namespace=0&format=json`,
-                session: secureSession,
-                useSessionCookies: false
-              });
-              wikiReq.setHeader('User-Agent', 'Mozilla/5.0');
-              wikiReq.on('response', (wr) => {
-                let d = ''; wr.on('data', c => d+=c);
-                wr.on('end', () => {
-                  try {
-                    const parsed = JSON.parse(d);
-                    if (parsed && parsed[1]) {
-                      for (let j = 0; j < parsed[1].length; j++) {
-                        results.push({
-                          title: parsed[1][j],
-                          description: parsed[2][j],
-                          url: parsed[3][j],
-                          displayUrl: parsed[3][j]
-                        });
-                      }
-                    }
-                  } catch(e) {}
-                  resolve({ success: true, results });
-                });
-              });
-              wikiReq.on('error', () => resolve({ success: true, results }));
-              wikiReq.end();
-            } else {
-              resolve({ success: true, results });
-            }
+
+            // Remove Wikipedia padding and mocks. Just return the raw, authentic DDG results.
+            resolve({ success: true, results });
           } catch (err) {
             resolve({ success: false, error: 'Failed to parse results' });
           }
