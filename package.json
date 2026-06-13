@@ -34,16 +34,23 @@
     ],
     "win": {
       "target": [
-        "squirrel",
+        "nsis",
         "zip"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Veil Browser",
+      "runAfterFinish": true
     }
   },
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.17.3",
     "cheerio": "^1.2.0",
-    "cross-fetch": "^4.1.0",
-    "electron-squirrel-startup": "^1.0.1"
+    "cross-fetch": "^4.1.0"
   },
   "devDependencies": {
     "@capacitor/android": "^8.3.4",
