@@ -1,4 +1,8 @@
-const { app, BrowserWindow, session, ipcMain, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, session, ipcMain, Menu, clipboard, protocol } = require('electron');
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true } }
+]);
 const path = require('path');
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
 const fetch = require('cross-fetch');
@@ -309,7 +313,7 @@ async function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000/browser');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../out/browser.html'));
+    mainWindow.loadURL('app://localhost/browser.html');
   }
 
   mainWindow.on('closed', () => { mainWindow = null; });
@@ -650,7 +654,19 @@ ipcMain.handle('toggle-tor', async (_event, enable) => {
   }
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  protocol.registerFileProtocol('app', (request, callback) => {
+    let url = request.url.replace('app://localhost/', '');
+    url = url.split('?')[0].split('#')[0];
+    try {
+      return callback({ path: path.normalize(`${__dirname}/../out/${url}`) });
+    } catch (err) {
+      console.error(err);
+      return callback(-6);
+    }
+  });
+  createWindow();
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 

@@ -39,6 +39,7 @@
 *.blockmap
 *.yml
 !electron-builder.yml
+!Veil_Setup_v1.exe
 
 # Tor binaries (downloaded via postinstall)
 /bin/tor/
