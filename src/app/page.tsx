@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Shield, Download, Lock, Globe, Zap, Bot, EyeOff, ChevronDown, Fingerprint, Wifi, Eye, BookOpen, Columns2, Search, X, AlertTriangle, CheckCircle2, GitCommit, HelpCircle } from 'lucide-react';
+import { Shield, Download, Lock, Globe, Zap, Bot, EyeOff, ChevronDown, Fingerprint, Wifi, Eye, BookOpen, Columns2, Search, X, AlertTriangle, CheckCircle2, GitCommit, HelpCircle, MessageSquare, Mail } from 'lucide-react';
 import './landing.css';
+
+const GithubIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.02c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A4.8 4.8 0 0 0 8 18v4"></path>
+  </svg>
+);
 
 function useInView(ref: React.RefObject<HTMLElement | null>, threshold = 0.15) {
   const [visible, setVisible] = useState(false);
@@ -257,16 +263,52 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="lp-footer">
-        <div className="lp-footer__inner">
-          <div className="lp-footer__brand">
-            <img src="/logo.png" alt="Veil" width={24} height={24} /> Veil Browser
+        <div className="lp-footer__container">
+          <div className="lp-footer__top">
+            <div className="lp-footer__col lp-footer__col--brand">
+              <div className="lp-logo">
+                <img src="/logo.png" alt="Veil" width={36} height={36} className="lp-logo__img" />
+                <span>Veil</span>
+              </div>
+              <p className="lp-footer__desc">
+                The next-generation browser engineered for absolute privacy. No telemetry, no trackers, just pure speed and security.
+              </p>
+              <div className="lp-footer__social">
+                <a href="https://github.com/BGx-11/browser" aria-label="GitHub"><GithubIcon size={20} /></a>
+                <a href="mailto:contact@veilbrowser.com" aria-label="Email"><Mail size={20} /></a>
+              </div>
+            </div>
+
+            <div className="lp-footer__col">
+              <h4>Product</h4>
+              <a href="#features">Features</a>
+              <a href="#privacy">Privacy</a>
+              <a href="#" onClick={(e) => { e.preventDefault(); setShowModal(true); }}>Download</a>
+              <a href="https://github.com/BGx-11/browser/releases">Release Notes</a>
+            </div>
+
+            <div className="lp-footer__col">
+              <h4>Resources</h4>
+              <a href="https://github.com/BGx-11/browser">Documentation</a>
+              <a href="https://github.com/BGx-11/browser/issues">Report an Issue</a>
+              <a href="https://github.com/BGx-11/browser/pulls">Contribute</a>
+              <a href="#">FAQ</a>
+            </div>
+
+            <div className="lp-footer__col">
+              <h4>Company</h4>
+              <a href="/about">About</a>
+              <a href="/blog">Blog</a>
+              <a href="/terms">Terms of Service</a>
+              <a href="/privacy">Privacy Policy</a>
+            </div>
           </div>
-          <div className="lp-footer__links">
-            <a href="https://github.com/BGx-11/Veil">GitHub</a>
-            <a href="/terms">Terms & Conditions</a>
-            <a href="/privacy">Privacy Policy</a>
+          
+          <div className="lp-footer__bottom">
+            <div className="lp-footer__copy">
+              © {new Date().getFullYear()} Veil Browser. Released under the MIT License.
+            </div>
           </div>
-          <div className="lp-footer__copy">© 2026 Veil Browser Contributors. MIT License.</div>
         </div>
       </footer>
 
