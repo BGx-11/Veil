@@ -78,7 +78,7 @@ export default function LandingPage() {
             <button onClick={() => setShowModal(true)} className="lp-btn lp-btn--primary">
               <Download size={18} /> Download for Windows
             </button>
-            <a href="https://github.com/BGx-11/Veil" className="lp-btn lp-btn--ghost">
+            <a href="https://github.com/BGx-11/browser" className="lp-btn lp-btn--ghost">
               View on GitHub
             </a>
           </div>
