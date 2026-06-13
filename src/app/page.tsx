@@ -267,46 +267,37 @@ export default function LandingPage() {
           <div className="lp-footer__top">
             <div className="lp-footer__col lp-footer__col--brand">
               <div className="lp-logo">
-                <img src="/logo.png" alt="Veil" width={36} height={36} className="lp-logo__img" />
+                <img src="/logo.png" alt="Veil" width={20} height={20} className="lp-logo__img" />
                 <span>Veil</span>
               </div>
               <p className="lp-footer__desc">
                 The next-generation browser engineered for absolute privacy. No telemetry, no trackers, just pure speed and security.
               </p>
-              <div className="lp-footer__social">
-                <a href="https://github.com/BGx-11/browser" aria-label="GitHub"><GithubIcon size={20} /></a>
-                <a href="mailto:contact@veilbrowser.com" aria-label="Email"><Mail size={20} /></a>
-              </div>
             </div>
 
             <div className="lp-footer__col">
-              <h4>Product</h4>
-              <a href="#features">Features</a>
-              <a href="#privacy">Privacy</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); setShowModal(true); }}>Download</a>
-              <a href="https://github.com/BGx-11/browser/releases">Release Notes</a>
+              <h4>Project Links</h4>
+              <a href="#features">Architecture</a>
+              <a href="#privacy">Privacy Deep Dive</a>
+              <a href="https://github.com/BGx-11/browser" target="_blank" rel="noopener noreferrer">Source Code</a>
+              <a href="https://github.com/BGx-11/browser/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
             </div>
 
             <div className="lp-footer__col">
-              <h4>Resources</h4>
-              <a href="https://github.com/BGx-11/browser">Documentation</a>
-              <a href="https://github.com/BGx-11/browser/issues">Report an Issue</a>
-              <a href="https://github.com/BGx-11/browser/pulls">Contribute</a>
-              <a href="#">FAQ</a>
-            </div>
-
-            <div className="lp-footer__col">
-              <h4>Company</h4>
-              <a href="/about">About</a>
-              <a href="/blog">Blog</a>
-              <a href="/terms">Terms of Service</a>
-              <a href="/privacy">Privacy Policy</a>
+              <h4>Creator</h4>
+              <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">Devansh Agarwal</a>
+              <a href="https://github.com/BGx-11" target="_blank" rel="noopener noreferrer">GitHub Profile</a>
+              <a href="https://www.linkedin.com/in/devanshag" target="_blank" rel="noopener noreferrer">LinkedIn</a>
             </div>
           </div>
           
           <div className="lp-footer__bottom">
             <div className="lp-footer__copy">
-              © {new Date().getFullYear()} Veil Browser. Released under the MIT License.
+              &copy; {new Date().getFullYear()} <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">BGx Cybersecurity</a>. All rights reserved.
+            </div>
+            <div className="lp-footer__legal">
+              <a href="/terms">Terms of Service</a>
+              <a href="/privacy">Privacy Policy</a>
             </div>
           </div>
         </div>
