@@ -1,5 +1,5 @@
-if (require('electron-squirrel-startup')) app.quit();
 const { app, BrowserWindow, session, ipcMain, Menu, clipboard, protocol } = require('electron');
+if (require('electron-squirrel-startup')) app.quit();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true } }
