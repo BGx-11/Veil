@@ -25,6 +25,7 @@ export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [showModal, setShowModal] = useState(false);
+  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'completed'>('idle');
   
   const heroRef = useRef<HTMLElement>(null);
   const featRef = useRef<HTMLElement>(null);
@@ -305,9 +306,15 @@ export default function LandingPage() {
 
       {/* Download Modal */}
       {showModal && (
-        <div className="lp-modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="lp-modal-overlay" onClick={() => {
+          setShowModal(false);
+          setTimeout(() => setDownloadState('idle'), 300);
+        }}>
           <div className="lp-modal" onClick={e => e.stopPropagation()}>
-            <button className="lp-modal-close" onClick={() => setShowModal(false)}>
+            <button className="lp-modal-close" onClick={() => {
+              setShowModal(false);
+              setTimeout(() => setDownloadState('idle'), 300);
+            }}>
               <X size={20} />
             </button>
             <div className="lp-modal-icon"><Download size={32} /></div>
@@ -315,13 +322,47 @@ export default function LandingPage() {
             <p>Get the latest release directly from our open-source repository.</p>
             
             <div className="lp-modal-actions">
-              <a 
-                href="https://github.com/BGx-11/browser/releases/download/v1/Veil_Setup_v1.zip" 
-                className="lp-btn lp-btn--primary"
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                Download .zip (Windows)
-              </a>
+              {downloadState === 'idle' && (
+                <button 
+                  onClick={() => {
+                    setDownloadState('downloading');
+                    setTimeout(() => {
+                      setDownloadState('completed');
+                      // Trigger actual download
+                      const link = document.createElement('a');
+                      link.href = 'https://github.com/BGx-11/browser/releases/download/v1/Veil_Setup_v1.zip';
+                      link.download = 'Veil_Setup_v1.zip';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }, 1500);
+                  }}
+                  className="lp-btn lp-btn--primary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  Download .zip (Windows)
+                </button>
+              )}
+              {downloadState === 'downloading' && (
+                <button 
+                  className="lp-btn lp-btn--primary"
+                  style={{ width: '100%', justifyContent: 'center', opacity: 0.8, cursor: 'wait' }}
+                  disabled
+                >
+                  <div className="bounce" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Download size={18} /> Downloading...
+                  </div>
+                </button>
+              )}
+              {downloadState === 'completed' && (
+                <button 
+                  className="lp-btn lp-btn--primary"
+                  style={{ width: '100%', justifyContent: 'center', background: '#10b981', borderColor: '#10b981' }}
+                  disabled
+                >
+                  <CheckCircle2 size={18} /> Download Completed!
+                </button>
+              )}
               <div className="lp-modal-note">
                 <Shield size={14} /> Open source and free forever.
               </div>

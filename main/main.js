@@ -1,3 +1,4 @@
+if (require('electron-squirrel-startup')) app.quit();
 const { app, BrowserWindow, session, ipcMain, Menu, clipboard, protocol } = require('electron');
 
 protocol.registerSchemesAsPrivileged([
