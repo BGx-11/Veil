@@ -1,6 +1,8 @@
 {
   "name": "veil-browser",
   "version": "0.1.0",
+  "description": "An open-source desktop browser featuring on-device AI summarization, integrated tracking protection, and Tor network routing.",
+  "author": "Veil Browser Community",
   "private": true,
   "main": "main/main.js",
   "scripts": {
@@ -32,7 +34,7 @@
     ],
     "win": {
       "target": [
-        "nsis",
+        "squirrel",
         "zip"
       ]
     }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://github.com/BGx-11/Veil'),
   title: 'Veil Browser | Open Source Privacy Browser',
   description: 'An open-source desktop browser featuring on-device AI summarization, integrated tracking protection, and Tor network routing.',
   keywords: ['browser', 'open source browser', 'privacy browser', 'tor integration', 'local AI', 'electron browser', 'nextjs browser'],

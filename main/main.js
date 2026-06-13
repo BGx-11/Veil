@@ -655,14 +655,18 @@ ipcMain.handle('toggle-tor', async (_event, enable) => {
 });
 
 app.whenReady().then(() => {
-  protocol.registerFileProtocol('app', (request, callback) => {
+  const { net } = require('electron');
+  const urlModule = require('url');
+
+  protocol.handle('app', (request) => {
     let url = request.url.replace('app://localhost/', '');
     url = url.split('?')[0].split('#')[0];
     try {
-      return callback({ path: path.normalize(`${__dirname}/../out/${url}`) });
+      const targetPath = path.normalize(`${__dirname}/../out/${url}`);
+      return net.fetch(urlModule.pathToFileURL(targetPath).toString());
     } catch (err) {
       console.error(err);
-      return callback(-6);
+      return new Response('File not found', { status: 404 });
     }
   });
   createWindow();
