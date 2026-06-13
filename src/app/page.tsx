@@ -316,7 +316,7 @@ export default function LandingPage() {
             
             <div className="lp-modal-actions">
               <a 
-                href="https://github.com/BGx-11/Veil/raw/main/Veil_Setup_v1.zip" 
+                href="https://github.com/BGx-11/Veil/releases/download/v1/Veil.Browser-0.1.0-win.zip" 
                 className="lp-btn lp-btn--primary"
                 style={{ width: '100%', justifyContent: 'center' }}
               >
