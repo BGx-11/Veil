@@ -292,9 +292,10 @@ export default function LandingPage() {
           
           <div className="lp-footer__bottom">
             <div className="lp-footer__copy">
-              &copy; {new Date().getFullYear()} <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">BGx Cybersecurity</a>. All rights reserved.
+              &copy; {new Date().getFullYear()} <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">BGx</a>. All rights reserved.
             </div>
             <div className="lp-footer__legal">
+              <a href="https://github.com/BGx-11/browser/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">About License</a>
               <a href="/terms">Terms of Service</a>
               <a href="/privacy">Privacy Policy</a>
             </div>
