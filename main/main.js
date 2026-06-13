@@ -310,6 +310,7 @@ async function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.webContents.on('did-fail-load', () => mainWindow.show());
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000/browser');
@@ -659,14 +660,28 @@ app.whenReady().then(() => {
   const { net } = require('electron');
   const urlModule = require('url');
 
-  protocol.handle('app', (request) => {
+  protocol.handle('app', async (request) => {
     let url = request.url.replace('app://localhost/', '');
     url = url.split('?')[0].split('#')[0];
+    if (!url || url === '/') url = 'browser.html';
     try {
       const targetPath = path.normalize(`${__dirname}/../out/${url}`);
-      return net.fetch(urlModule.pathToFileURL(targetPath).toString());
+      const data = await fs.promises.readFile(targetPath);
+      let ext = path.extname(targetPath).toLowerCase();
+      let mime = 'text/plain';
+      if (ext === '.html') mime = 'text/html';
+      else if (ext === '.js') mime = 'text/javascript';
+      else if (ext === '.css') mime = 'text/css';
+      else if (ext === '.json') mime = 'application/json';
+      else if (ext === '.png') mime = 'image/png';
+      else if (ext === '.svg') mime = 'image/svg+xml';
+      else if (ext === '.ico') mime = 'image/x-icon';
+
+      return new Response(data, {
+        headers: { 'Content-Type': mime }
+      });
     } catch (err) {
-      console.error(err);
+      console.error('Protocol handler error for url:', url, err);
       return new Response('File not found', { status: 404 });
     }
   });
