@@ -1,13 +1,24 @@
+const fs = require('fs');
+const path = require('path');
+const logPath = path.join(require('os').tmpdir(), 'veil_debug.log');
+fs.writeFileSync(logPath, 'App started\n');
+process.on('uncaughtException', (err) => {
+  fs.appendFileSync(logPath, 'UNCAUGHT EXCEPTION: ' + err.stack + '\n');
+});
+process.on('unhandledRejection', (reason, p) => {
+  fs.appendFileSync(logPath, 'UNHANDLED REJECTION: ' + reason + '\n');
+});
+
 const { app, BrowserWindow, session, ipcMain, Menu, clipboard, protocol } = require('electron');
 if (require('electron-squirrel-startup')) app.quit();
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { secure: true, standard: true, supportFetchAPI: true } }
 ]);
-const path = require('path');
+
 const { ElectronBlocker } = require('@ghostery/adblocker-electron');
 const fetch = require('cross-fetch');
-const fs = require('fs');
+
 const { startTor, stopTor } = require('./tor-manager');
 
 // ── Security hardening BEFORE app ready ──
@@ -726,3 +737,4 @@ ipcMain.handle('get-ip-info', () => {
     req.end();
   });
 });
+
