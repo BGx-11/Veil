@@ -287,7 +287,6 @@ export default function LandingPage() {
               <h4>Creator</h4>
               <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">Devansh Agarwal</a>
               <a href="https://github.com/BGx-11" target="_blank" rel="noopener noreferrer">GitHub Profile</a>
-              <a href="https://www.linkedin.com/in/devanshag" target="_blank" rel="noopener noreferrer">LinkedIn</a>
             </div>
           </div>
           
