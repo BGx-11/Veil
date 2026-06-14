@@ -6,8 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "cross-env CI=false tauri build",
-    "build:next": "next build",
+    "build": "next build",
+    "tauri:build": "cross-env CI=false tauri build",
     "dev:next": "next dev",
     "lint": "eslint"
   },
