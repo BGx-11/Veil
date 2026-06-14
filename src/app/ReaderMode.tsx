@@ -78,19 +78,65 @@ export default function ReaderMode({ isOpen, onClose, webviewRef }: ReaderModePr
     if (!isOpen || !webviewRef?.current) return;
     setLoading(true);
     try {
-      webviewRef.current.executeJavaScript(EXTRACTION_SCRIPT).then((result: string) => {
-        try {
-          const parsed = JSON.parse(result);
-          setContent(parsed);
-        } catch (e) {
-          setContent({ title: 'Error', content: '<p>Failed to parse article content.</p>', siteName: '' });
-        }
+      const iframe = webviewRef.current as HTMLIFrameElement;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc) {
+        setContent({ title: 'Error', content: '<p>Could not access page content. The page may be cross-origin protected.</p>', siteName: '' });
         setLoading(false);
-      }).catch(() => {
-        setContent({ title: 'Error', content: '<p>Could not access page content.</p>', siteName: '' });
+        return;
+      }
+
+      // Extract article content from iframe document
+      const selectors = [
+        'article', '[role="main"]', 'main',
+        '.post-content', '.article-content', '.entry-content',
+        '.post-body', '.article-body', '#article-body',
+        '.story-body', '.content-body',
+      ];
+      let article: Element | null = null;
+      for (const sel of selectors) {
+        article = doc.querySelector(sel);
+        if (article && (article.textContent?.trim().length || 0) > 200) break;
+        article = null;
+      }
+      // Fallback: find the largest text block
+      if (!article) {
+        let best: Element | null = null;
+        let bestLen = 0;
+        doc.querySelectorAll('div, section').forEach((el) => {
+          const text = el.textContent || '';
+          const pCount = el.querySelectorAll('p').length;
+          if (pCount >= 3 && text.length > bestLen) {
+            bestLen = text.length;
+            best = el;
+          }
+        });
+        article = best;
+      }
+
+      if (!article) {
+        setContent({ title: doc.title, content: '<p>Could not extract article content from this page.</p>', siteName: '' });
         setLoading(false);
+        return;
+      }
+
+      const clone = article.cloneNode(true) as Element;
+      clone.querySelectorAll('script, style, nav, footer, aside, iframe, .ad, .ads, .social, .share, .comments, .sidebar, .related, .newsletter, form').forEach(el => el.remove());
+      const ogSite = doc.querySelector('meta[property="og:site_name"]');
+      const siteName = ogSite ? ogSite.getAttribute('content') || '' : '';
+      const words = (clone.textContent || '').trim().split(/\s+/).length;
+      const readingTime = Math.max(1, Math.ceil(words / 200));
+
+      setContent({
+        title: doc.title,
+        content: clone.innerHTML,
+        siteName,
+        readingTime,
+        wordCount: words,
       });
-    } catch (e) {
+      setLoading(false);
+    } catch (_e) {
+      setContent({ title: 'Error', content: '<p>Could not access page content. The page may be cross-origin protected.</p>', siteName: '' });
       setLoading(false);
     }
   }, [isOpen, webviewRef?.current]);

@@ -1,6 +1,7 @@
 # Veil Browser
 
-![Electron](https://img.shields.io/badge/Built_with-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white)
+![Tauri](https://img.shields.io/badge/Built_with-Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-black?style=for-the-badge&logo=rust)
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
@@ -11,7 +12,7 @@
 
 > **Note**: Veil Browser is currently **Windows Only**. macOS and Linux builds are planned for the future.
 
-Veil is a privacy-hardened desktop browser built entirely with **Electron + Next.js + React**. It combines **network-level ad/tracker blocking** via the Ghostery engine (augmented with uBlock Origin Privacy lists), **one-click Tor Network integration**, and a **WebGPU-accelerated on-device AI** that summarizes web pages locally — your data never leaves your machine. Wrapped in a stunning glassmorphism UI with both dark and light themes.
+Veil is an ultra-lightweight, privacy-hardened desktop browser built entirely with **Tauri + Rust + Next.js**. It combines **network-level ad/tracker blocking**, **one-click Tor Network integration**, and a **WebGPU-accelerated on-device AI** that summarizes web pages locally — your data never leaves your machine. Wrapped in a stunning glassmorphism UI with both dark and light themes.
 
 ---
 
@@ -26,8 +27,9 @@ Veil is a privacy-hardened desktop browser built entirely with **Electron + Next
 ### 🆕 Features
 | Feature | Description |
 |---------|-------------|
+| **Ultra-Lightweight Core** | Built on Tauri and Rust, producing a blazingly fast ~15MB binary with minimal memory usage. |
 | **Hardened Tracker Blocker** | Network-level blocking powered by Ghostery + uBlock Origin Privacy, Badware, and Peter Lowe's lists. Blocks trackers before they load. |
-| **Custom Google Search** | Replaced basic DuckDuckGo with direct Google Scrapers for Rich Media (Images, Videos, Shopping, News). |
+| **Custom Google Search** | Direct Google Scrapers for Rich Media (Images, Videos, Shopping, News). |
 | **Tor Network Toggle** | One-click SOCKS5 proxy through the decentralized Tor network for true anonymity |
 | **Veil AI (On-Device SLM)** | WebGPU-accelerated local LLM (`Xenova/Qwen1.5-0.5B-Chat`) for page summarization — zero cloud dependency |
 | **Reader Mode** | Distraction-free article reading with clean typography |
@@ -39,22 +41,21 @@ Veil is a privacy-hardened desktop browser built entirely with **Electron + Next
 | **Full Keyboard Shortcuts** | Complete set (Ctrl+T, Ctrl+W, Ctrl+F, Ctrl+Shift+T, etc.) |
 | **Light & Dark Glassmorphism** | Premium glass UI with smooth theme transitions |
 | **Privacy Hardening** | WebRTC leak protection, fingerprint resistance, referer stripping, HTTPS upgrades |
-| **Futuristic Landing Page** | Apple-like distribution page with animations for web hosting |
 
 ---
 
 ## 🏗️ Architecture
 
-Veil is built on a multi-process architecture utilizing Electron and Next.js, prioritizing security, privacy, and local execution.
+Veil is built on a modern multi-process architecture utilizing Tauri and Rust, prioritizing security, privacy, and local execution with minimal resource footprint.
 
 ```mermaid
 flowchart TD
-    User([User Request]) --> Renderer
-    Renderer[Next.js Renderer \n Tab & UI Management] --> IPC[Electron IPC Bridge]
-    IPC --> Main[Electron Main Process]
+    User([User Request]) --> UI
+    UI[Next.js UI \n Tab & State Management] --> IPC[Tauri IPC Bridge]
+    IPC --> Backend[Rust Backend]
     
-    Main --> Session[Session Manager]
-    Session --> Filter[Hardened Tracker Blocker]
+    Backend --> Manager[Tauri Webview Manager]
+    Manager --> Filter[Ad/Tracker Blocker]
     
     Filter -->|Blocked| Drop((Drop Request))
     Filter -->|Allowed| Routing{Tor Enabled?}
@@ -68,31 +69,23 @@ flowchart TD
     Hardening --> Web[External Web]
 ```
 
-### Electron Main Process
-- **App Lifecycle & IPC:** Manages window state, native menus, and secure inter-process communication.
-- **Session Manager:** Controls the underlying Chromium network stack, handling downloads, permissions, and intercepting requests.
+### Rust Backend (Tauri Main Process)
+- **App Lifecycle & IPC:** Manages window state, native menus, and blazing-fast IPC commands.
 - **Security Layer:**
-  - **Ghostery Engine:** Intercepts network requests and blocks known ads and trackers before they are loaded.
-  - **Tor SOCKS5 Proxy:** Routes all web traffic through the Tor network when enabled.
-  - **Privacy Hardening:** Strips referer headers, blocks WebRTC IP leaks, and injects noise into HTML5 Canvas to prevent fingerprinting.
+  - **Tor Daemon Manager:** Spawns and monitors the Tor network process, configuring system proxy routing on demand.
+  - **Search Proxy:** Native Rust `reqwest` fetching to bypass CORS and securely scrape rich media without client-side exposure.
 
 ### Next.js Renderer (React 19)
 - **Tab & Window Management:** Handles complex state for tabs, split view, reader mode, and the resizable sidebar.
-- **WebView Container:** Renders web pages in isolated `<webview>` tags to maintain security boundaries.
+- **WebView Container:** Renders web pages in lightweight OS-native webviews (WebView2 on Windows).
 - **On-Device AI Engine:** Uses Transformers.js with WebGPU acceleration to run Local Language Models (SLMs) entirely in the browser for page summarization.
-
-### 🔒 Privacy Pipeline
-1. **Request Initiation:** User navigates to a URL.
-2. **Routing:** If Tor mode is enabled, traffic is routed through a local SOCKS5 proxy connected to the Tor network. Otherwise, a direct connection is established.
-3. **Ghostery Filter:** The network request is analyzed against the Ghostery blocklist. If a tracker is detected, the request is immediately blocked.
-4. **Privacy Hardening:** For allowed requests, referer headers are stripped, WebRTC is guarded, and Canvas APIs are randomized.
-5. **Rendering:** The secure page is rendered in the isolated WebView.
 
 ---
 
 ## 🚀 Setup & Deployment Guide
 
 ### Prerequisites
+- **Rust** (cargo v1.77+)
 - **Node.js** v18+ (v20+ recommended)
 - **npm** v9+
 - **Git**
@@ -104,25 +97,19 @@ flowchart TD
 git clone https://github.com/BGx-11/Veil.git
 cd Veil
 
-# Install dependencies (also downloads Tor binaries via postinstall)
+# Install dependencies
 npm install
 
-# Start the development server
-npm run dev
+# Start the Tauri development server
+npm run tauri dev
 ```
 
 ### Building for Production
 
-```powershell
-# Create unpacked build (no code signing required)
-npm run pack
-
-# Create distributable installer (.exe / .dmg / .AppImage)
-npm run dist
+```bash
+# Build the highly optimized Tauri executable
+npm run tauri build
 ```
-
-> [!NOTE]
-> On Windows, `npm run dist` may fail if you don't have symlink privileges. Use `npm run pack` instead, or run your terminal as Administrator.
 
 ---
 
@@ -130,12 +117,14 @@ npm run dist
 
 ```
 Veil/
-├── main/                  # Electron main process
-│   ├── main.js            # App lifecycle, IPC, session management, search
-│   └── preload.js         # Secure bridge between main & renderer
+├── src-tauri/             # Rust backend and system integration
+│   ├── src/
+│   │   ├── main.rs        # Tauri entrypoint & IPC Handlers
+│   │   └── lib.rs         # Tauri builder and core logic
+│   └── Cargo.toml         # Rust dependencies
 ├── src/
 │   ├── app/
-│   │   ├── browser/       # Browser shell (Electron loads this route)
+│   │   ├── browser/       # Browser shell
 │   │   │   └── page.tsx   # Core browser component (1100+ lines)
 │   │   ├── page.tsx       # Futuristic landing page for distribution
 │   │   ├── globals.css    # Design system & theme tokens
@@ -150,8 +139,6 @@ Veil/
 │   │   └── ReaderMode.tsx # Reader mode
 │   └── lib/
 │       └── slm.ts         # AI model pipeline (Transformers.js + WebGPU)
-├── scripts/
-│   └── download-tor.js    # Tor binary downloader (postinstall)
 ├── public/
 │   ├── logo.png           # BGx brand logo
 │   └── wasm/              # WebAssembly files for AI

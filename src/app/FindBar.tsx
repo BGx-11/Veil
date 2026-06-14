@@ -23,45 +23,36 @@ export default function FindBar({ isOpen, onClose, webviewRef }: FindBarProps) {
     if (!isOpen) {
       setQuery('');
       setMatchInfo(null);
-      if (webviewRef?.current) {
-        try { webviewRef.current.stopFindInPage('clearSelection'); } catch (e) {}
-      }
+      // Clear selection in iframe
+      try {
+        const iframe = webviewRef?.current as HTMLIFrameElement | undefined;
+        const win = iframe?.contentWindow;
+        if (win) win.getSelection()?.removeAllRanges();
+      } catch (_e) { /* cross-origin */ }
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!webviewRef?.current || !isOpen) return;
-    const wv = webviewRef.current;
-
-    const handleFound = (e: any) => {
-      if (e.result) {
-        setMatchInfo({
-          activeMatchOrdinal: e.result.activeMatchOrdinal,
-          matches: e.result.matches,
-        });
-      }
-    };
-
-    wv.addEventListener('found-in-page', handleFound);
-    return () => {
-      try { wv.removeEventListener('found-in-page', handleFound); } catch (e) {}
-    };
-  }, [webviewRef?.current, isOpen]);
 
   const doFind = (text: string, forward = true) => {
     if (!webviewRef?.current || !text) {
       setMatchInfo(null);
-      if (webviewRef?.current) {
-        try { webviewRef.current.stopFindInPage('clearSelection'); } catch (e) {}
-      }
+      try {
+        const iframe = webviewRef?.current as HTMLIFrameElement | undefined;
+        const win = iframe?.contentWindow;
+        if (win) win.getSelection()?.removeAllRanges();
+      } catch (_e) {}
       return;
     }
     try {
-      webviewRef.current.findInPage(text, {
-        forward,
-        matchCase: caseSensitive,
-      });
-    } catch (e) {}
+      const iframe = webviewRef.current as HTMLIFrameElement;
+      const win = iframe.contentWindow;
+      if (win) {
+        const found = (win as any).find(text, caseSensitive, !forward, true, false, false, false);
+        setMatchInfo(found ? { activeMatchOrdinal: 1, matches: 1 } : { activeMatchOrdinal: 0, matches: 0 });
+      }
+    } catch (_e) {
+      // Cross-origin — can't search
+      setMatchInfo({ activeMatchOrdinal: 0, matches: 0 });
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

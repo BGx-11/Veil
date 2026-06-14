@@ -17,26 +17,10 @@ export default function Downloads() {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
 
   useEffect(() => {
-    // Initial fetch
-    if (typeof window !== 'undefined' && (window as any).electronAPI) {
-      (window as any).electronAPI.getDownloads().then(setDownloads);
-      
-      // Listen for updates
-      (window as any).electronAPI.onDownloadUpdated((dl: DownloadItem) => {
-        setDownloads((prev) => {
-          const idx = prev.findIndex(d => d.id === dl.id);
-          if (idx !== -1) {
-            const next = [...prev];
-            next[idx] = dl;
-            return next;
-          }
-          return [dl, ...prev];
-        });
-      });
-    }
+    // Downloads are handled natively by the OS in Tauri
   }, []);
 
-  const api = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+  const api: any = null;
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';

@@ -136,7 +136,7 @@ export default function LandingPage() {
             { icon: <BookOpen size={24} />, title: 'Reader Mode', desc: 'Distraction-free reading with beautiful typography. Focus on content.', color: '#f59e0b' },
             { icon: <Columns2 size={24} />, title: 'Split View', desc: 'Side-by-side tab multitasking. Research and browse simultaneously.', color: '#06b6d4' },
             { icon: <Search size={24} />, title: 'Private Search', desc: 'DuckDuckGo integration with AI summaries. No tracking, no profiling.', color: '#8b5cf6' },
-            { icon: <Zap size={24} />, title: 'Blazing Fast', desc: 'Electron + Next.js + React 19. Hardware-accelerated rendering.', color: '#22c55e' },
+            { icon: <Zap size={24} />, title: 'Blazing Fast', desc: 'Tauri + Rust + Next.js. Ultra-lightweight native rendering.', color: '#22c55e' },
           ].map((f, i) => (
             <div key={i} className="lp-fcard" style={{ animationDelay: `${i * 0.08}s`, '--card-accent': f.color } as React.CSSProperties}>
               <div className="lp-fcard__icon" style={{ background: `${f.color}15`, color: f.color }}>{f.icon}</div>
@@ -200,7 +200,7 @@ export default function LandingPage() {
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#475569', fontSize: '15px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Core:</strong> Integrated Tor SOCKS5 network routing natively without external daemons.</li>
                 <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>AI Engine:</strong> WebGPU-accelerated local summarization using Transformers.js.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Privacy:</strong> Ghostery Tracker blocker engine fully migrated to the Electron session layer.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Privacy:</strong> Ghostery Tracker blocker engine fully integrated into the native Rust proxy layer.</li>
                 <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>UI:</strong> Next.js 15 React architecture implemented for maximum performance.</li>
               </ul>
             </div>

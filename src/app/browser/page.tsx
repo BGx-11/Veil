@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   Shield, Plus, X, ArrowLeft, ArrowRight, RotateCw, Home, Lock, Unlock, Settings as SettingsIcon, LayoutDashboard, Globe, List, Monitor, Maximize, Minus, Square, PanelLeft, EyeOff, Check, XCircle, Mic, Video, VolumeX, Eye, Search, Volume2, Languages, Bot, Download, BookOpen, Clock, Pin, Columns2, MoreVertical, Star, Sun, Moon
 } from 'lucide-react';
@@ -190,7 +191,23 @@ export default function BrowserShell() {
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   const wvRefs = useRef<Record<string, any>>({});
-  const api = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+  const api: any = {
+    invoke,
+    getPreloadPath: () => '',
+    getTrackerCount: async () => 0,
+    onTrackerBlocked: (_cb: any) => {},
+    onNewTabRequested: (_cb: any) => {},
+    onTorProgress: null,
+    showContextMenu: () => {},
+    getIpInfo: async () => ({ ip: '127.0.0.1', country: 'Unknown' }),
+    winFullscreen: () => { try { invoke('plugin:window|set_fullscreen', { value: true }); } catch (_e) {} },
+    winMinimize: () => { try { invoke('plugin:window|minimize'); } catch (_e) {} },
+    winMaximize: () => { try { invoke('plugin:window|toggle_maximize'); } catch (_e) {} },
+    winClose: () => { try { invoke('plugin:window|close'); } catch (_e) {} },
+    toggleTor: async (v: boolean) => invoke('toggle_tor', { enable: v }),
+    updateBlocklist: () => {},
+    updateSettings: () => {},
+  };
   const active = tabs.find((t) => t.id === activeId);
 
   // Toast helper
@@ -257,114 +274,50 @@ export default function BrowserShell() {
     if (active) setUrlInput(displayUrl(active.url));
   }, [activeId, active?.url]);
 
-  /* ─── Webview event listeners ─── */
+  /* ─── Iframe event listeners ─── */
   useEffect(() => {
     if (!mounted) return;
     tabs.forEach((tab) => {
-      const wv = wvRefs.current[tab.id];
-      if (!wv || wv._bound) return;
-      wv._bound = true;
+      const iframe = wvRefs.current[tab.id] as HTMLIFrameElement | undefined;
+      if (!iframe || (iframe as any)._bound) return;
+      (iframe as any)._bound = true;
 
-      wv.addEventListener('page-title-updated', (e: any) => {
-        setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, title: e.title } : t)));
-      });
-
-      // Favicon
-      wv.addEventListener('page-favicon-updated', (e: any) => {
-        if (e.favicons && e.favicons.length > 0) {
-          setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, favicon: e.favicons[0] } : t)));
-        }
-      });
-
-      wv.addEventListener('did-navigate', (e: any) => {
-        if (!isInternal(e.url)) {
-          setTabs((p) => p.map((t) => {
-            if (t.id !== tab.id) return t;
-            if (t.url === e.url) return { ...t, loading: false }; // Skip if URL is identical (e.g. reload)
-            const newHistory = t.history.slice(0, t.historyIndex + 1);
-            newHistory.push(e.url);
-            return { ...t, url: e.url, history: newHistory, historyIndex: newHistory.length - 1, loading: false, readerMode: false };
-          }));
-          // Record in global history
-          setGlobalHistory(prev => [{ url: e.url, title: '', timestamp: Date.now() }, ...prev]);
-        }
-      });
-      wv.addEventListener('did-navigate-in-page', (e: any) => {
-        if (!isInternal(e.url)) {
-          setTabs((p) => p.map((t) => {
-            if (t.id !== tab.id) return t;
-            if (t.url === e.url) return t;
-            const newHistory = t.history.slice(0, t.historyIndex + 1);
-            newHistory.push(e.url);
-            return { ...t, url: e.url, history: newHistory, historyIndex: newHistory.length - 1, error: undefined };
-          }));
-        }
-      });
-      wv.addEventListener('did-fail-load', (e: any) => {
-        if (e.isMainFrame) {
-          if (settingsRef.current.httpsOnly && e.validatedURL && e.validatedURL.startsWith('https://') && e.errorCode !== -3) {
-            setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, error: `HTTPS_UPGRADE_FAILED:${e.validatedURL}`, loading: false } : t)));
-            return;
-          }
-          const errMsg = e.errorCode === -3 
-            ? 'Request Blocked: This page was stopped by the built-in privacy shield.' 
-            : `Failed to load: ${e.errorDescription} (${e.errorCode})`;
-          setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, error: errMsg, loading: false } : t)));
-        }
-      });
-      wv.addEventListener('did-start-loading', () => {
-        setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, loading: true, loadProgress: 10 } : t)));
-      });
-      wv.addEventListener('did-stop-loading', () => {
+      iframe.addEventListener('load', () => {
         setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, loading: false, loadProgress: 100 } : t)));
-        // Update history entry with title
-        setTimeout(() => {
-          try {
-            const currentTab = wvRefs.current[tab.id];
-            if (currentTab) {
-              const title = currentTab.getTitle();
-              const url = currentTab.getURL();
-              if (title && url) {
-                setGlobalHistory(prev => {
-                  const idx = prev.findIndex(h => h.url === url && !h.title);
-                  if (idx !== -1) {
-                    const updated = [...prev];
-                    updated[idx] = { ...updated[idx], title };
-                    return updated;
-                  }
-                  return prev;
-                });
-              }
+        // Try to extract title from same-origin iframe
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (doc) {
+            const title = doc.title || tab.title;
+            setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, title } : t)));
+            // Try to get favicon
+            const linkIcon = doc.querySelector('link[rel*="icon"]') as HTMLLinkElement | null;
+            if (linkIcon?.href) {
+              setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, favicon: linkIcon.href } : t)));
             }
-          } catch (e) {}
-        }, 200);
-      });
-      wv.addEventListener('media-started-playing', () => {
-        setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, mediaPlaying: true } : t)));
-      });
-      wv.addEventListener('media-paused', () => {
-        setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, mediaPlaying: false } : t)));
-      });
-      wv.addEventListener('ipc-message', (e: any) => {
-        if (e.channel === 'media-devices-active') {
-          const { video, audio } = e.args[0];
-          setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, cameraUsing: video, micUsing: audio } : t)));
-        }
-      });
-      wv.addEventListener('did-redirect-navigation', (e: any) => {
-        setTabs((p) => p.map((t) => {
-          if (t.id === tab.id) {
-            const chain = t.redirectChain ? [...t.redirectChain] : [];
-            chain.push(e.url);
-            return { ...t, redirectChain: chain };
           }
-          return t;
-        }));
-      });
-      wv.addEventListener('context-menu', (e: any) => {
-        if (api && api.showContextMenu) {
-          api.showContextMenu(e.params);
+        } catch (_e) {
+          // Cross-origin — use domain-based favicon fallback
+          try {
+            const domain = new URL(tab.url).hostname;
+            setTabs((p) => p.map((t) => (t.id === tab.id ? {
+              ...t,
+              title: t.title === 'Loading...' ? domain : t.title,
+              favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+            } : t)));
+          } catch (_e2) {}
         }
+        // Record in global history
+        if (!isInternal(tab.url)) {
+          setGlobalHistory(prev => {
+            if (prev[0]?.url === tab.url) return prev;
+            return [{ url: tab.url, title: tab.title, timestamp: Date.now() }, ...prev];
+          });
+        }
+      });
+
+      iframe.addEventListener('error', () => {
+        setTabs((p) => p.map((t) => (t.id === tab.id ? { ...t, error: 'Failed to load page', loading: false } : t)));
       });
     });
   }, [tabs.length, mounted]);
@@ -517,6 +470,11 @@ export default function BrowserShell() {
       const other = tabs.find(t => t.id !== activeId);
       if (other) {
         setSplitTabId(other.id);
+        showToast('Split view enabled', 'info');
+      } else {
+        const newId = Date.now().toString();
+        setTabs(p => [...p, { id: newId, url: NEWTAB, title: 'New Tab', history: [NEWTAB], historyIndex: 0, loading: false }]);
+        setSplitTabId(newId);
         showToast('Split view enabled', 'info');
       }
     }
@@ -679,10 +637,10 @@ export default function BrowserShell() {
     showToast('History cleared', 'info');
   }, [showToast]);
 
-  /* ─── Window controls ─── */
-  const winMin = () => api?.winMinimize();
-  const winMax = () => api?.winMaximize();
-  const winClose = () => api?.winClose();
+  /* ─── Window controls (Tauri) ─── */
+  const winMin = () => { try { invoke('plugin:window|minimize'); } catch (_e) {} };
+  const winMax = () => { try { invoke('plugin:window|toggle_maximize'); } catch (_e) {} };
+  const winClose = () => { try { invoke('plugin:window|close'); } catch (_e) {} };
 
   // Sort tabs: pinned first, then unpinned
   const sortedTabs = [...tabs].sort((a, b) => {
@@ -698,14 +656,13 @@ export default function BrowserShell() {
 
   useEffect(() => {
     if (slmOpen && active && !isInternal(active.url)) {
-      const wv = wvRefs.current[active.id];
-      if (wv) {
-        wv.executeJavaScript('document.body.innerText').then((text: string) => {
-           setSlmContext(`URL: ${active.url}\nTitle: ${active.title}\nPage Content:\n${text.substring(0, 5000)}`);
-        }).catch(() => {
-           setSlmContext(`URL: ${active.url}\nTitle: ${active.title}`);
-        });
-      }
+      const iframe = wvRefs.current[active.id] as HTMLIFrameElement | undefined;
+      let text = '';
+      try {
+        const doc = iframe?.contentDocument || iframe?.contentWindow?.document;
+        text = doc?.body?.innerText?.substring(0, 5000) || '';
+      } catch (_e) { /* cross-origin */ }
+      setSlmContext(`URL: ${active.url}\nTitle: ${active.title}${text ? `\nPage Content:\n${text}` : ''}`);
     } else if (active && isInternal(active.url)) {
       setSlmContext(`Internal Page: ${active.url}`);
     }
@@ -922,8 +879,11 @@ export default function BrowserShell() {
                 onClick={() => {
                   if (active && active.url && !active.url.startsWith('browser://') && !active.url.includes('translate.google.com')) {
                     const translateUrl = `https://translate.google.com/translate?sl=auto&tl=${translateTarget}&u=${encodeURIComponent(active.url)}`;
-                    setTabs(tabs.map(t => t.id === activeId ? { ...t, url: translateUrl, redirectChain: [] } : t));
-                    setUrlInput(translateUrl);
+                    nav(activeId, translateUrl);
+                    const wv = wvRefs.current[activeId];
+                    if (wv && (wv as any).loadURL) {
+                      wv.src = translateUrl;
+                    }
                   }
                   setTranslateOpen(false);
                 }}
@@ -1016,13 +976,13 @@ export default function BrowserShell() {
                 <SearchResults query={tab.url.replace('search://', '')} onNavigate={(u) => nav(tab.id, u)} />
               ) : mounted && api ? (
                 <>
-                  <webview
+                  <iframe
                     ref={(el) => { if (el) wvRefs.current[tab.id] = el; }}
-                    src={tab.url}
-                    preload={preloadPath}
-                    partition={settings.normalMode && !settings.torMode ? "persist:default" : "in-memory"}
+                    src={`http://127.0.0.1:8181/proxy?url=${encodeURIComponent(tab.url)}`}
+                    
+                    
                     style={{ width: '100%', height: '100%', border: 'none', display: tab.error || tab.readerMode ? 'none' : 'flex' }}
-                    allowpopups={"true" as any}
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                   />
 
                   {/* Reader Mode Overlay */}
@@ -1088,7 +1048,7 @@ export default function BrowserShell() {
                   )}
                 </>
               ) : mounted ? (
-                <iframe src={tab.url} title={tab.title} style={{ width: '100%', height: '100%', border: 'none' }} />
+                <iframe src={`http://127.0.0.1:8181/proxy?url=${encodeURIComponent(tab.url)}`} title={tab.title} style={{ width: '100%', height: '100%', border: 'none' }} />
               ) : null}
             </div>
           );

@@ -54,89 +54,114 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
 
     (async () => {
       try {
-        if ((window as any).electronAPI) {
-          const res = await (window as any).electronAPI.performSearch(query, activeTab);
-          if (!alive) return;
-          if (res.success) {
-            setResults(res.results);
-            
-            // Only trigger SLM Summarization for 'All' tab
-            if (activeTab === 'All') {
-              setSlmGenerating(true);
-              (async () => {
-                try {
-                  progressCb = (data: any) => {
-                    if (data.status === 'downloading') {
-                      if (alive) {
-                        setSlmProgress(`Downloading Veil Neural Engine...`);
-                        setDownloadProgress((data.loaded / data.total) * 100);
-                      }
-                    } else if (data.status === 'init') {
-                      if (alive) {
-                        setSlmProgress('Initializing AI Engine...');
-                        setDownloadProgress(0);
-                      }
-                    } else if (data.status === 'ready') {             
-                      if (alive) setSlmProgress('Summarizing results...');
-                    }
-                  };
-                  // Pass null to use the globally selected model, or let slm.ts handle it
-                  const generator = await getSLMPipeline(progressCb);
-                  const contextText = res.results.slice(0, 3).map((r: any) => r.title + ': ' + r.description).join('\n');
-                  const messagesArray = [
-                    { role: 'system', content: 'You are Veil AI, an expert research assistant. Read the following search results and write a single, brief paragraph that directly answers the user\'s query. Do not use conversational filler, and do not include information not found in the results.' },
-                    { role: 'user', content: `Query: ${query}\n\nSearch Results:\n${contextText}` }
-                  ];
-                  const output = await generator(messagesArray, { max_new_tokens: 100 });
-                  let text = output[0].generated_text;
-                  if (Array.isArray(text)) {
-                    text = text[text.length - 1].content;
-                  } else if (typeof text === 'string') {
-                    if (text.includes('<|assistant|>\n')) text = text.split('<|assistant|>\n').pop()?.trim() || text;
-                  }
-                  if (alive) setSlmSummary(text);
-                } catch (e: any) {
-                  console.warn("Could not load AI model in SearchResults", e);
-                  if (alive) {
-                    setSlmProgress(`AI Error: ${e.message}`);
-                    setSlmGenerating(false);
-                  }
-                } finally {
-                  if (alive) setSlmGenerating(false);
-                }
-              })();
-            }
-          }
-          else setError(res.error || 'Search failed');
-          
-          if (activeTab === 'All') {
+        // Fetch search results through the local proxy
+        const searchUrl = `http://127.0.0.1:8181/proxy?url=${encodeURIComponent(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(decodeURIComponent(query))}`)}`;
+        const response = await fetch(searchUrl);
+        if (!alive) return;
+        const html = await response.text();
+        
+        // Parse DuckDuckGo HTML results
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const resultNodes = doc.querySelectorAll('.result');
+        const parsed: SearchResult[] = [];
+        resultNodes.forEach((node) => {
+          const linkEl = node.querySelector('.result__a') as HTMLAnchorElement | null;
+          const snippetEl = node.querySelector('.result__snippet');
+          if (linkEl) {
+            const href = linkEl.getAttribute('href') || '';
+            // DuckDuckGo uses redirect URLs, extract the actual URL
+            let actualUrl = href;
             try {
-              const cleanQuery = query.trim();
-              let wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`);
-              let data = await wikiRes.json();
-              if (data.type === 'disambiguation' || data.title === 'Not found.') {
-                const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*`);
-                const searchData = await searchRes.json();
-                if (searchData?.query?.search?.length > 0) {
-                  const bestTitle = searchData.query.search[0].title;
-                  wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestTitle)}`);
-                  data = await wikiRes.json();
-                }
-              }
+              const u = new URL(href, 'https://duckduckgo.com');
+              actualUrl = u.searchParams.get('uddg') || href;
+            } catch (_e) { /* use href as-is */ }
+            parsed.push({
+              title: linkEl.textContent || '',
+              description: snippetEl?.textContent || '',
+              url: actualUrl,
+              displayUrl: actualUrl,
+            });
+          }
+        });
 
-              if (data.type !== 'disambiguation' && data.title !== 'Not found.' && data.extract && alive) {
-                setKnowledgePanel(data);
-              } else if (alive) {
-                setKnowledgePanel(null);
+        if (parsed.length > 0) {
+          setResults(parsed);
+          
+          // Only trigger SLM Summarization for 'All' tab
+          if (activeTab === 'All') {
+            setSlmGenerating(true);
+            (async () => {
+              try {
+                progressCb = (data: any) => {
+                  if (data.status === 'downloading') {
+                    if (alive) {
+                      setSlmProgress(`Downloading Veil Neural Engine...`);
+                      setDownloadProgress((data.loaded / data.total) * 100);
+                    }
+                  } else if (data.status === 'init') {
+                    if (alive) {
+                      setSlmProgress('Initializing AI Engine...');
+                      setDownloadProgress(0);
+                    }
+                  } else if (data.status === 'ready') {             
+                    if (alive) setSlmProgress('Summarizing results...');
+                  }
+                };
+                const generator = await getSLMPipeline(progressCb);
+                const contextText = parsed.slice(0, 3).map((r: any) => r.title + ': ' + r.description).join('\n');
+                const messagesArray = [
+                  { role: 'system', content: 'You are Veil AI, an expert research assistant. Read the following search results and write a single, brief paragraph that directly answers the user\'s query. Do not use conversational filler, and do not include information not found in the results.' },
+                  { role: 'user', content: `Query: ${query}\n\nSearch Results:\n${contextText}` }
+                ];
+                const output = await generator(messagesArray, { max_new_tokens: 100 });
+                let text = output[0].generated_text;
+                if (Array.isArray(text)) {
+                  text = text[text.length - 1].content;
+                } else if (typeof text === 'string') {
+                  if (text.includes('<|assistant|>\n')) text = text.split('<|assistant|>\n').pop()?.trim() || text;
+                }
+                if (alive) setSlmSummary(text);
+              } catch (e: any) {
+                console.warn("Could not load AI model in SearchResults", e);
+                if (alive) {
+                  setSlmProgress(`AI Error: ${e.message}`);
+                  setSlmGenerating(false);
+                }
+              } finally {
+                if (alive) setSlmGenerating(false);
               }
-            } catch (e) {
-              if (alive) setKnowledgePanel(null);
-            }
-          } else {
-            setKnowledgePanel(null);
+            })();
           }
         } else {
-          setError('Search requires Veil desktop app.');
+          setError('No results found');
+        }
+        
+        if (activeTab === 'All') {
+          try {
+            const cleanQuery = decodeURIComponent(query).trim();
+            let wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQuery)}`);
+            let data = await wikiRes.json();
+            if (data.type === 'disambiguation' || data.title === 'Not found.') {
+              const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&utf8=&format=json&origin=*`);
+              const searchData = await searchRes.json();
+              if (searchData?.query?.search?.length > 0) {
+                const bestTitle = searchData.query.search[0].title;
+                wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(bestTitle)}`);
+                data = await wikiRes.json();
+              }
+            }
+
+            if (data.type !== 'disambiguation' && data.title !== 'Not found.' && data.extract && alive) {
+              setKnowledgePanel(data);
+            } else if (alive) {
+              setKnowledgePanel(null);
+            }
+          } catch (e) {
+            if (alive) setKnowledgePanel(null);
+          }
+        } else {
+          setKnowledgePanel(null);
         }
       } catch (err: any) {
         if (alive) setError(err.message);

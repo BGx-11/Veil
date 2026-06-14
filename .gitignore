@@ -21,14 +21,17 @@
 /android/
 /ios/
 
-# Archives
+# Tauri build artifacts
+/src-tauri/target/
+
+# Legacy Electron build artifacts
+/release-forge/
+
+# Archives & Installers
 *.zip
 *.7z
 *.tar.gz
 *.rar
-!Veil_Setup_v1.zip
-
-# Electron Builder
 *.exe
 *.dmg
 *.AppImage
@@ -37,9 +40,6 @@
 *.rpm
 *.msi
 *.blockmap
-*.yml
-!electron-builder.yml
-!Veil_Setup_v1.exe
 
 # Tor binaries (downloaded via postinstall)
 /bin/tor/
@@ -80,3 +80,4 @@ next-env.d.ts
 .vercel
 scratch.js
 test-*.js
+update-*.js
