@@ -85,7 +85,7 @@ export default function LandingPage() {
             <button onClick={() => setShowModal(true)} className="lp-btn lp-btn--primary">
               <Download size={18} /> Download for Windows
             </button>
-            <a href="https://github.com/BGx-11/browser" className="lp-btn lp-btn--ghost">
+            <a href="https://github.com/BGx-11/Veil" className="lp-btn lp-btn--ghost">
               View on GitHub
             </a>
           </div>
@@ -280,8 +280,8 @@ export default function LandingPage() {
               <h4>Project Links</h4>
               <a href="#features">Architecture</a>
               <a href="#privacy">Privacy Deep Dive</a>
-              <a href="https://github.com/BGx-11/browser" target="_blank" rel="noopener noreferrer">Source Code</a>
-              <a href="https://github.com/BGx-11/browser/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
+              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noopener noreferrer">Source Code</a>
+              <a href="https://github.com/BGx-11/Veil/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
             </div>
 
             <div className="lp-footer__col">
@@ -296,7 +296,7 @@ export default function LandingPage() {
               &copy; {new Date().getFullYear()} <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">BGx</a>. All rights reserved.
             </div>
             <div className="lp-footer__legal">
-              <a href="https://github.com/BGx-11/browser/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">About License</a>
+              <a href="https://github.com/BGx-11/Veil/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">About License</a>
               <a href="/terms">Terms of Service</a>
               <a href="/privacy">Privacy Policy</a>
             </div>
@@ -330,8 +330,8 @@ export default function LandingPage() {
                       setDownloadState('completed');
                       // Trigger actual download
                       const link = document.createElement('a');
-                      link.href = 'https://github.com/BGx-11/browser/releases/download/v1/Veil_Setup_v1.zip';
-                      link.download = 'Veil_Setup_v1.zip';
+                      link.href = 'https://github.com/BGx-11/Veil/releases/latest/download/Veil_Setup_v1.exe';
+                      link.download = 'Veil_Setup_v1.exe';
                       document.body.appendChild(link);
                       link.click();
                       document.body.removeChild(link);
@@ -340,7 +340,7 @@ export default function LandingPage() {
                   className="lp-btn lp-btn--primary"
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
-                  Download .zip (Windows)
+                  Download Setup .exe (Windows)
                 </button>
               )}
               {downloadState === 'downloading' && (
