@@ -10,14 +10,16 @@
     "dev:next": "next dev",
     "dev:electron": "wait-on http://localhost:3000 && electron .",
     "build": "next build",
-    "start": "next start",
+    "start": "electron-forge start",
     "lint": "eslint",
     "pack": "next build && electron-builder --dir",
     "dist": "next build && electron-builder",
     "cap:init": "cap init VeilBrowser com.veil.browser --web-dir out",
     "cap:build": "next build && cap sync",
     "cap:open": "cap open android",
-    "postinstall": "node scripts/download-tor.js"
+    "postinstall": "node scripts/download-tor.js",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
   },
   "build": {
     "appId": "com.veil.browser",
@@ -50,12 +52,21 @@
   "dependencies": {
     "@ghostery/adblocker-electron": "^2.17.3",
     "cheerio": "^1.2.0",
-    "cross-fetch": "^4.1.0"
+    "cross-fetch": "^4.1.0",
+    "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
     "@capacitor/android": "^8.3.4",
     "@capacitor/cli": "^8.3.4",
     "@capacitor/core": "^8.3.4",
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
+    "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron/fuses": "^1.8.0",
     "@huggingface/transformers": "^4.2.0",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -63,7 +74,6 @@
     "concurrently": "^10.0.0",
     "cross-env": "^10.1.0",
     "electron": "^42.3.0",
-    "electron-builder": "^26.8.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "lucide-react": "^1.17.0",
