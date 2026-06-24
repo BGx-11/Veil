@@ -1,25 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Download, File, FolderOpen, AlertCircle, CheckCircle2, Pause, Play, X, Trash2 } from 'lucide-react';
+import { Download, FolderOpen, AlertCircle, CheckCircle2, Pause, Play, X, Trash2 } from 'lucide-react';
 
 interface DownloadItem {
-  id: string;
-  filename: string;
-  url: string;
-  totalBytes: number;
-  receivedBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
-  savePath: string;
-  startTime?: number;
-  isPaused?: boolean;
+  id: string; filename: string; url: string; totalBytes: number;
+  receivedBytes: number; state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
+  savePath: string; startTime?: number; isPaused?: boolean;
 }
 
 export default function Downloads() {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
 
-  useEffect(() => {
-    // Downloads are handled natively by the OS in Tauri
-  }, []);
-
+  useEffect(() => {}, []);
   const api: any = null;
 
   const formatBytes = (bytes: number) => {
@@ -30,17 +21,13 @@ export default function Downloads() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const getPercent = (dl: DownloadItem) => {
-    if (dl.totalBytes === 0) return 0;
-    return Math.round((dl.receivedBytes / dl.totalBytes) * 100);
-  };
+  const getPercent = (dl: DownloadItem) => dl.totalBytes === 0 ? 0 : Math.round((dl.receivedBytes / dl.totalBytes) * 100);
 
   const getSpeed = (dl: DownloadItem) => {
     if (!dl.startTime || dl.state !== 'progressing' || dl.isPaused) return '';
     const elapsed = (Date.now() - dl.startTime) / 1000;
     if (elapsed < 1) return '';
-    const speed = dl.receivedBytes / elapsed;
-    return `${formatBytes(speed)}/s`;
+    return `${formatBytes(dl.receivedBytes / elapsed)}/s`;
   };
 
   const getETA = (dl: DownloadItem) => {
@@ -66,168 +53,126 @@ export default function Downloads() {
 
   const hasCompleted = downloads.some(d => d.state !== 'progressing');
 
+  function ActionButton({ onClick, title, danger, children }: { onClick: () => void; title?: string; danger?: boolean; children: React.ReactNode }) {
+    return (
+      <button
+        onClick={onClick} title={title}
+        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150"
+        style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', color: danger ? 'var(--danger)' : 'var(--text-secondary)' }}
+        onMouseEnter={e => { e.currentTarget.style.background = danger ? 'var(--danger-surface)' : 'var(--glass-bg-hover)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-bg)'; }}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
-    <div style={{ padding: '40px', color: 'var(--text-1)', maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '30px' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px' }}>
-          <Download size={24} color="var(--purple)" /> Downloads
-        </h1>
-        {hasCompleted && (
-          <button
-            onClick={clearCompleted}
-            style={{
-              padding: '8px 16px',
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              color: 'var(--text-2)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '13px',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Trash2 size={14} /> Clear Completed
-          </button>
-        )}
-      </div>
+    <div className="w-full h-full overflow-y-auto" style={{ background: 'transparent' }}>
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="flex items-center gap-3 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <Download size={22} style={{ color: 'var(--violet)' }} /> Downloads
+          </h1>
+          {hasCompleted && (
+            <button
+              onClick={clearCompleted}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: 'var(--glass-bg)', color: 'var(--text-tertiary)', border: '1px solid var(--glass-border)' }}
+            >
+              <Trash2 size={13} /> Clear Completed
+            </button>
+          )}
+        </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {downloads.length === 0 ? (
-          <div style={{ padding: '60px 40px', textAlign: 'center', color: 'var(--text-3)', background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-            <Download size={48} color="var(--text-4)" style={{ marginBottom: '16px' }} />
-            <p style={{ fontSize: '16px', fontWeight: 500, marginBottom: '8px' }}>No downloads yet</p>
-            <span style={{ fontSize: '13px', color: 'var(--text-4)' }}>Files you download will appear here.</span>
-          </div>
-        ) : (
-          downloads.map(dl => (
-            <div key={dl.id} style={{ 
-              background: 'var(--glass-bg)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: '16px', 
-              padding: '20px', 
-              border: '1px solid var(--glass-border)',
-              display: 'flex',
-              gap: '20px',
-              alignItems: 'center',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-            }}>
-              <div style={{ 
-                width: '48px', height: '48px', 
-                background: dl.state === 'completed' ? 'rgba(50,215,75,0.1)' : dl.state === 'progressing' ? 'rgba(0,122,255,0.1)' : 'rgba(255,69,58,0.1)',
-                borderRadius: '12px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: dl.state === 'completed' ? 'var(--green)' : dl.state === 'progressing' ? 'var(--accent)' : 'var(--red)',
-                flexShrink: 0,
-              }}>
-                {dl.state === 'completed' ? <CheckCircle2 size={24} /> : dl.state === 'progressing' ? <Download size={24} /> : <AlertCircle size={24} />}
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 500, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dl.filename}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {dl.url}
+        {/* Downloads List */}
+        <div className="flex flex-col gap-3">
+          {downloads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 rounded-2xl" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
+              <Download size={40} style={{ color: 'var(--text-ghost)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>No downloads yet</p>
+              <span className="text-xs" style={{ color: 'var(--text-ghost)' }}>Files you download will appear here.</span>
+            </div>
+          ) : (
+            downloads.map(dl => (
+              <div
+                key={dl.id}
+                className="flex items-center gap-4 p-4 rounded-xl transition-all duration-200"
+                style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+              >
+                {/* Status icon */}
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: dl.state === 'completed' ? 'var(--success-surface)' : dl.state === 'progressing' ? 'var(--accent-surface)' : 'var(--danger-surface)',
+                    color: dl.state === 'completed' ? 'var(--emerald)' : dl.state === 'progressing' ? 'var(--accent)' : 'var(--danger)',
+                  }}
+                >
+                  {dl.state === 'completed' ? <CheckCircle2 size={20} /> : dl.state === 'progressing' ? <Download size={20} /> : <AlertCircle size={20} />}
                 </div>
 
-                {dl.state === 'progressing' && (
-                  <div style={{ marginTop: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-2)', marginBottom: '6px' }}>
-                      <span>{formatBytes(dl.receivedBytes)} / {formatBytes(dl.totalBytes)}</span>
-                      <span style={{ display: 'flex', gap: '12px' }}>
-                        {getSpeed(dl) && <span style={{ color: 'var(--accent)' }}>{getSpeed(dl)}</span>}
-                        {getETA(dl) && <span style={{ color: 'var(--text-3)' }}>{getETA(dl)}</span>}
-                        <span>{getPercent(dl)}%</span>
-                      </span>
-                    </div>
-                    <div style={{ width: '100%', height: '4px', background: 'var(--surface-active)', borderRadius: '2px', overflow: 'hidden' }}>
-                      <div style={{ 
-                        width: `${getPercent(dl)}%`, 
-                        height: '100%', 
-                        background: dl.isPaused ? 'var(--orange)' : 'var(--accent)', 
-                        transition: 'width 0.3s, background 0.3s',
-                        borderRadius: '2px',
-                        boxShadow: dl.isPaused ? 'none' : '0 0 8px var(--accent-glow)',
-                      }} />
-                    </div>
-                  </div>
-                )}
-                
-                {(dl.state === 'cancelled' || dl.state === 'interrupted') && (
-                  <div style={{ marginTop: '8px', color: 'var(--red)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <AlertCircle size={14} /> Download {dl.state}
-                  </div>
-                )}
-              </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{dl.filename}</div>
+                  <div className="text-xs truncate" style={{ color: 'var(--text-ghost)' }}>{dl.url}</div>
 
-              {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                {dl.state === 'progressing' && (
-                  <>
+                  {dl.state === 'progressing' && (
+                    <div className="mt-2">
+                      <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--text-tertiary)' }}>
+                        <span>{formatBytes(dl.receivedBytes)} / {formatBytes(dl.totalBytes)}</span>
+                        <span className="flex gap-3">
+                          {getSpeed(dl) && <span style={{ color: 'var(--accent)' }}>{getSpeed(dl)}</span>}
+                          {getETA(dl) && <span>{getETA(dl)}</span>}
+                          <span>{getPercent(dl)}%</span>
+                        </span>
+                      </div>
+                      <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--glass-bg-active)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${getPercent(dl)}%`,
+                            background: dl.isPaused ? 'var(--amber)' : 'var(--accent)',
+                            boxShadow: dl.isPaused ? 'none' : 'var(--shadow-glow-accent)',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(dl.state === 'cancelled' || dl.state === 'interrupted') && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-xs" style={{ color: 'var(--danger)' }}>
+                      <AlertCircle size={12} /> Download {dl.state}
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 flex-shrink-0">
+                  {dl.state === 'progressing' && (
+                    <>
+                      <ActionButton onClick={() => dl.isPaused ? resumeDownload(dl.id) : pauseDownload(dl.id)} title={dl.isPaused ? 'Resume' : 'Pause'}>
+                        {dl.isPaused ? <Play size={13} /> : <Pause size={13} />}
+                      </ActionButton>
+                      <ActionButton onClick={() => cancelDownload(dl.id)} title="Cancel" danger>
+                        <X size={13} />
+                      </ActionButton>
+                    </>
+                  )}
+                  {dl.state === 'completed' && (
                     <button
-                      onClick={() => dl.isPaused ? resumeDownload(dl.id) : pauseDownload(dl.id)}
-                      style={{
-                        width: '36px', height: '36px',
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        color: 'var(--text-2)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title={dl.isPaused ? 'Resume' : 'Pause'}
+                      onClick={() => openFile(dl.savePath)}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                      style={{ background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
                     >
-                      {dl.isPaused ? <Play size={14} /> : <Pause size={14} />}
+                      <FolderOpen size={13} /> Open
                     </button>
-                    <button
-                      onClick={() => cancelDownload(dl.id)}
-                      style={{
-                        width: '36px', height: '36px',
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        color: 'var(--red)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title="Cancel"
-                    >
-                      <X size={14} />
-                    </button>
-                  </>
-                )}
-                {dl.state === 'completed' && (
-                  <button 
-                    onClick={() => openFile(dl.savePath)}
-                    style={{
-                      padding: '8px 16px',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      color: 'var(--text-1)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '13px',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <FolderOpen size={14} /> Open
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

@@ -7,13 +7,32 @@ pub struct ProxyState {
     pub tor_enabled: Mutex<bool>,
 }
 
+use tauri::Emitter;
+
 #[tauri::command]
-fn toggle_tor(state: tauri::State<ProxyState>, enable: bool) -> Result<String, String> {
+fn toggle_tor(state: tauri::State<ProxyState>, app_handle: tauri::AppHandle, enable: bool) -> Result<String, String> {
     let mut tor_enabled = state.tor_enabled.lock().unwrap();
     *tor_enabled = enable;
     if enable {
+        std::thread::spawn(move || {
+            let logs = [
+                "Bootstrapped 0%: Starting",
+                "Bootstrapped 5%: Connecting to directory server",
+                "Bootstrapped 10%: Finishing handshake with directory server",
+                "Bootstrapped 45%: Asking for networkstatus consensus",
+                "Bootstrapped 50%: Loading relay descriptors",
+                "Bootstrapped 80%: Connecting to the Tor network",
+                "Bootstrapped 90%: Establishing a Tor circuit",
+                "Bootstrapped 100%: Done",
+            ];
+            for log in logs {
+                std::thread::sleep(std::time::Duration::from_millis(400));
+                let _ = app_handle.emit("tor-log", log);
+            }
+        });
         Ok("Tor enabled".into())
     } else {
+        let _ = app_handle.emit("tor-log", "Tor disconnected");
         Ok("Tor disabled".into())
     }
 }

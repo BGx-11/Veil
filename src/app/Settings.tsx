@@ -1,18 +1,15 @@
 'use client';
 
 import React from 'react';
-
-interface SettingsProps {
-  settings: any;
-  onToggle: (key: string, value?: any) => Promise<void>;
-}
-
 import { Shield, Fingerprint, Network, Palette, ListX, Trash2, Plus } from 'lucide-react';
+
+interface SettingsProps { settings: any; onToggle: (key: string, value?: any) => Promise<void>; }
 
 const sections = [
   {
     title: 'Privacy & Tracking',
-    icon: <Shield size={18} color="var(--accent)" />,
+    icon: <Shield size={18} />,
+    iconColor: 'var(--accent-primary)',
     items: [
       { key: 'normalMode', label: 'Normal Browsing Mode', desc: 'Allows persistent cookies and sessions for sites like YouTube (requires restart)' },
       { key: 'adBlocker', label: 'Ad & Tracker Blocker', desc: 'Blocks ads, trackers, and malware domains (Ghostery engine)' },
@@ -22,7 +19,8 @@ const sections = [
   },
   {
     title: 'Fingerprint Resistance',
-    icon: <Fingerprint size={18} color="var(--purple)" />,
+    icon: <Fingerprint size={18} />,
+    iconColor: 'var(--accent-secondary)',
     items: [
       { key: 'canvasNoise', label: 'Canvas Fingerprint Noise', desc: 'Injects random noise into canvas reads to prevent fingerprinting' },
       { key: 'blockWebRTC', label: 'Block WebRTC IP Leak', desc: 'Prevents websites from detecting your real IP via WebRTC' },
@@ -30,7 +28,8 @@ const sections = [
   },
   {
     title: 'Network',
-    icon: <Network size={18} color="var(--cyan)" />,
+    icon: <Network size={18} />,
+    iconColor: 'var(--accent-success)',
     items: [
       { key: 'dnsOverHttps', label: 'DNS-over-HTTPS', desc: 'Encrypts DNS queries via Cloudflare (1.1.1.1)' },
       { key: 'torMode', label: 'Tor Routing', desc: 'Route all traffic through the Tor network (requires tor.exe in PATH)' },
@@ -38,19 +37,43 @@ const sections = [
     ],
   },
   {
-    title: 'Custom Website Blocker',
-    icon: <ListX size={18} color="var(--red)" />,
+    title: 'Website Blocker',
+    icon: <ListX size={18} />,
+    iconColor: 'var(--accent-danger)',
     items: [],
     customRender: true,
   },
   {
     title: 'Appearance',
-    icon: <Palette size={18} color="var(--orange)" />,
+    icon: <Palette size={18} />,
+    iconColor: 'var(--accent-warning)',
     items: [
       { key: 'darkMode', label: 'Dark Mode', desc: 'Switch between dark and light themes' },
     ],
   },
 ];
+
+function Toggle({ on, loading, onClick }: { on: boolean; loading: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0 ${on ? 'shadow-[var(--glow-primary)]' : ''}`}
+      style={{
+        background: on ? 'var(--accent-primary)' : 'var(--surface-icon-bg)',
+        opacity: loading ? 0.5 : 1,
+        cursor: loading ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <div
+        className="absolute top-[2px] w-[20px] h-[20px] rounded-full transition-all duration-300 bg-white"
+        style={{
+          left: on ? '26px' : '2px',
+          boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+        }}
+      />
+    </button>
+  );
+}
 
 export default function Settings({ settings, onToggle }: SettingsProps) {
   const [loadingKey, setLoadingKey] = React.useState<string | null>(null);
@@ -59,81 +82,90 @@ export default function Settings({ settings, onToggle }: SettingsProps) {
   const addBlock = () => {
     if (newBlock.trim()) {
       const list = settings.blocklist || [];
-      if (!list.includes(newBlock.trim())) {
-        onToggle('blocklist', [...list, newBlock.trim()]);
-      }
+      if (!list.includes(newBlock.trim())) onToggle('blocklist', [...list, newBlock.trim()]);
       setNewBlock('');
     }
   };
 
   const removeBlock = (domain: string) => {
-    const list = settings.blocklist || [];
-    onToggle('blocklist', list.filter((d: string) => d !== domain));
+    onToggle('blocklist', (settings.blocklist || []).filter((d: string) => d !== domain));
   };
 
   const handleToggle = async (key: string) => {
     if (loadingKey) return;
     setLoadingKey(key);
-    try {
-      await onToggle(key);
-    } finally {
-      setLoadingKey(null);
-    }
+    try { await onToggle(key); } finally { setLoadingKey(null); }
   };
 
   return (
-    <div className="settings-page">
-      <div className="settings-title">Secure Settings</div>
+    <div className="w-full overflow-y-auto px-8 py-10">
+      <h2 className="text-2xl font-bold mb-8 text-[var(--text-primary)] tracking-tight">Settings</h2>
 
       {sections.map((sec) => (
-        <div key={sec.title} className="settings-section" style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: '24px', padding: '24px', marginBottom: '24px', boxShadow: 'var(--shadow-sm)', backdropFilter: 'blur(20px)' }}>
-          <div className="settings-section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: 'none', paddingBottom: '0', marginBottom: '16px', fontSize: '13px', color: 'var(--text-1)' }}>
-            <div style={{ background: 'var(--surface-active)', padding: '6px', borderRadius: '8px' }}>{sec.icon}</div>
-            {sec.title}
+        <div
+          key={sec.title}
+          className="mb-6 rounded-3xl p-6 transition-all duration-300 bg-[var(--bg-element)]/60 backdrop-blur-xl border border-[var(--border-color)] shadow-sm"
+        >
+          {/* Section header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[var(--surface-icon-bg)]" style={{ color: sec.iconColor }}>
+              {sec.icon}
+            </div>
+            <span className="text-lg font-semibold text-[var(--text-primary)] tracking-wide">{sec.title}</span>
           </div>
-          
+
           {sec.customRender ? (
-            <div className="settings-custom-blocklist" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-3)', marginBottom: '8px' }}>Enter domains to block completely (e.g. facebook.com). They will be intercepted at the network level.</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  placeholder="e.g. example.com" 
-                  value={newBlock}
-                  onChange={(e) => setNewBlock(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addBlock()}
-                  style={{ flex: 1, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-1)', fontSize: '13px' }}
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Enter domains to block completely (e.g. facebook.com).
+              </p>
+              <div className="flex gap-3">
+                <input
+                  type="text" placeholder="e.g. example.com" value={newBlock}
+                  onChange={e => setNewBlock(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addBlock()}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm bg-[var(--surface-icon-bg)] border border-[var(--border-color)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)] focus:ring-2 focus:ring-[var(--accent-primary)]/20 transition-all"
                 />
-                <button onClick={addBlock} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}><Plus size={16} /> Add</button>
+                <button
+                  onClick={addBlock}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] transition-all shadow-[var(--glow-primary)] hover:scale-105 active:scale-95"
+                >
+                  <Plus size={16} /> Add
+                </button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+              <div className="flex flex-col gap-2 mt-2">
                 {(settings.blocklist || []).map((domain: string) => (
-                  <div key={domain} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <span style={{ fontSize: '13px', color: 'var(--text-2)' }}>{domain}</span>
-                    <button onClick={() => removeBlock(domain)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', opacity: 0.8 }}><Trash2 size={16} /></button>
+                  <div
+                    key={domain}
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-[var(--surface-icon-bg)] border border-[var(--border-color)] transition-all hover:bg-[var(--surface-icon-hover)]"
+                  >
+                    <span className="text-sm font-medium text-[var(--text-secondary)]">{domain}</span>
+                    <button onClick={() => removeBlock(domain)} className="text-[var(--accent-danger)] opacity-70 hover:opacity-100 transition-opacity p-1 hover:bg-[var(--accent-danger)]/10 rounded-md">
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            sec.items.map((item) => (
-              <div key={item.key} className="settings-row">
-                <div className="settings-row-info">
-                  <div className="settings-row-label">{item.label}</div>
-                  <div className="settings-row-desc">{item.desc}</div>
-                </div>
+            <div className="flex flex-col gap-2">
+              {sec.items.map((item) => (
                 <div
-                  className={`toggle ${(settings as any)[item.key] ? 'on' : ''} ${loadingKey === item.key ? 'loading' : ''}`}
-                  onClick={() => handleToggle(item.key)}
-                  style={{ opacity: loadingKey === item.key ? 0.5 : 1, pointerEvents: loadingKey === item.key ? 'none' : 'auto' }}
-                />
-                {loadingKey === item.key && (
-                  <div style={{ fontSize: '11px', color: 'var(--accent)', marginLeft: '10px' }}>
-                    {item.key === 'torMode' && !(settings as any)['torMode'] ? 'Starting Tor...' : 'Saving...'}
+                  key={item.key}
+                  className="flex items-center justify-between py-4 px-4 rounded-xl transition-colors hover:bg-[var(--surface-icon-bg)]"
+                >
+                  <div className="flex-1 min-w-0 mr-6">
+                    <div className="text-base font-medium text-[var(--text-primary)]">{item.label}</div>
+                    <div className="text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">{item.desc}</div>
                   </div>
-                )}
-              </div>
-            ))
+                  <Toggle
+                    on={!!(settings as any)[item.key]}
+                    loading={loadingKey === item.key}
+                    onClick={() => handleToggle(item.key)}
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       ))}

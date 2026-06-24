@@ -1,19 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Clock, Search, Trash2, ChevronRight, Globe, ExternalLink } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Clock, Search, Trash2, Globe, ExternalLink } from 'lucide-react';
 
-interface HistoryEntry {
-  url: string;
-  title: string;
-  timestamp: number;
-}
-
-interface HistoryProps {
-  history: HistoryEntry[];
-  onNavigate: (url: string) => void;
-  onClearHistory: (before?: number) => void;
-}
+interface HistoryEntry { url: string; title: string; timestamp: number; }
+interface HistoryProps { history: HistoryEntry[]; onNavigate: (url: string) => void; onClearHistory: (before?: number) => void; }
 
 export default function History({ history, onNavigate, onClearHistory }: HistoryProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,11 +13,7 @@ export default function History({ history, onNavigate, onClearHistory }: History
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return history;
     const q = searchQuery.toLowerCase();
-    return history.filter(
-      (h) =>
-        h.title.toLowerCase().includes(q) ||
-        h.url.toLowerCase().includes(q)
-    );
+    return history.filter(h => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q));
   }, [history, searchQuery]);
 
   const grouped = useMemo(() => {
@@ -34,119 +21,107 @@ export default function History({ history, onNavigate, onClearHistory }: History
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const yesterdayStart = todayStart - 86400000;
     const weekStart = todayStart - 6 * 86400000;
-
     const groups: { label: string; entries: HistoryEntry[] }[] = [
-      { label: 'Today', entries: [] },
-      { label: 'Yesterday', entries: [] },
-      { label: 'This Week', entries: [] },
-      { label: 'Earlier', entries: [] },
+      { label: 'Today', entries: [] }, { label: 'Yesterday', entries: [] },
+      { label: 'This Week', entries: [] }, { label: 'Earlier', entries: [] },
     ];
-
     for (const entry of filtered) {
       if (entry.timestamp >= todayStart) groups[0].entries.push(entry);
       else if (entry.timestamp >= yesterdayStart) groups[1].entries.push(entry);
       else if (entry.timestamp >= weekStart) groups[2].entries.push(entry);
       else groups[3].entries.push(entry);
     }
-
-    return groups.filter((g) => g.entries.length > 0);
+    return groups.filter(g => g.entries.length > 0);
   }, [filtered]);
 
-  const formatTime = (ts: number) => {
-    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getDomain = (url: string) => {
-    try { return new URL(url).hostname; } catch { return url; }
-  };
+  const formatTime = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const getDomain = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
 
   return (
-    <div className="history-page">
-      <div className="history-header">
-        <div className="history-title-row">
-          <h1>
-            <Clock size={24} color="var(--accent)" />
-            Browsing History
+    <div className="w-full h-full overflow-y-auto" style={{ background: 'transparent' }}>
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="flex items-center gap-3 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <Clock size={22} style={{ color: 'var(--accent)' }} />
+            History
           </h1>
-          <div className="history-actions">
-            {confirmClear ? (
-              <div className="history-confirm-clear">
-                <span>Clear all history?</span>
-                <button className="history-confirm-yes" onClick={() => { onClearHistory(); setConfirmClear(false); }}>
-                  Yes, Clear All
-                </button>
-                <button className="history-confirm-no" onClick={() => setConfirmClear(false)}>
-                  Cancel
-                </button>
-              </div>
-            ) : (
+          {confirmClear ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Clear all?</span>
               <button
-                className="history-clear-btn"
-                onClick={() => setConfirmClear(true)}
-                disabled={history.length === 0}
-              >
-                <Trash2 size={14} />
-                Clear History
-              </button>
-            )}
-          </div>
+                onClick={() => { onClearHistory(); setConfirmClear(false); }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{ background: 'var(--danger-surface)', color: 'var(--danger)' }}
+              >Yes, Clear</button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{ background: 'var(--glass-bg)', color: 'var(--text-tertiary)' }}
+              >Cancel</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClear(true)}
+              disabled={history.length === 0}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-30"
+              style={{ background: 'var(--glass-bg)', color: 'var(--text-tertiary)', border: '1px solid var(--glass-border)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--danger-surface)'; e.currentTarget.style.color = 'var(--danger)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-bg)'; e.currentTarget.style.color = 'var(--text-tertiary)'; }}
+            >
+              <Trash2 size={13} /> Clear
+            </button>
+          )}
         </div>
-        <div className="history-search">
-          <Search size={16} />
+
+        {/* Search */}
+        <div
+          className="flex items-center gap-3 px-4 py-2.5 rounded-xl mb-8 transition-all duration-200"
+          style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+        >
+          <Search size={15} style={{ color: 'var(--text-ghost)' }} />
           <input
-            type="text"
-            placeholder="Search history..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            type="text" placeholder="Search history…" value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent border-none outline-none text-sm"
+            style={{ color: 'var(--text-primary)' }}
           />
         </div>
-      </div>
 
-      <div className="history-content">
+        {/* Content */}
         {history.length === 0 ? (
-          <div className="history-empty">
-            <Clock size={48} color="var(--text-4)" />
-            <p>No browsing history yet.</p>
-            <span>Your browsing history will appear here.</span>
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Clock size={40} style={{ color: 'var(--text-ghost)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>No browsing history yet.</p>
           </div>
         ) : grouped.length === 0 ? (
-          <div className="history-empty">
-            <Search size={48} color="var(--text-4)" />
-            <p>No results found.</p>
-            <span>Try a different search term.</span>
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Search size={40} style={{ color: 'var(--text-ghost)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-tertiary)' }}>No results found.</p>
           </div>
         ) : (
-          grouped.map((group) => (
-            <div key={group.label} className="history-group">
-              <div className="history-group-header">
-                <span>{group.label}</span>
-                <span className="history-group-count">{group.entries.length}</span>
+          grouped.map(group => (
+            <div key={group.label} className="mb-6">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-xs font-bold tracking-[0.15em] uppercase" style={{ color: 'var(--text-ghost)' }}>{group.label}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: 'var(--glass-bg-active)', color: 'var(--text-tertiary)' }}>{group.entries.length}</span>
               </div>
-              <div className="history-group-list">
+              <div className="flex flex-col gap-0.5">
                 {group.entries.map((entry, i) => (
                   <div
                     key={`${entry.timestamp}-${i}`}
-                    className="history-entry"
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-150"
                     onClick={() => onNavigate(entry.url)}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-bg-hover)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                   >
-                    <div className="history-entry-favicon">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${getDomain(entry.url)}&sz=32`}
-                        alt=""
-                        width={16}
-                        height={16}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          e.currentTarget.parentElement!.innerHTML = '<span class="history-entry-globe"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></span>';
-                        }}
-                      />
+                    <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ opacity: 0.5 }}>
+                      <img src={`https://www.google.com/s2/favicons?domain=${getDomain(entry.url)}&sz=32`} alt="" className="w-3.5 h-3.5" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                     </div>
-                    <div className="history-entry-info">
-                      <span className="history-entry-title">{entry.title || entry.url}</span>
-                      <span className="history-entry-url">{getDomain(entry.url)}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm truncate block" style={{ color: 'var(--text-secondary)' }}>{entry.title || entry.url}</span>
                     </div>
-                    <span className="history-entry-time">{formatTime(entry.timestamp)}</span>
-                    <ExternalLink size={12} className="history-entry-arrow" />
+                    <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-ghost)' }}>{formatTime(entry.timestamp)}</span>
                   </div>
                 ))}
               </div>
