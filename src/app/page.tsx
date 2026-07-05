@@ -217,14 +217,14 @@ export default function LandingPage() {
       </section>
 
       {/* Warning Banner / Open Source Notice */}
-      <section className="lp-warning-banner" style={{ background: '#fff', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', padding: '24px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', maxWidth: '800px', margin: '0 auto', padding: '0 24px' }}>
-          <div style={{ flexShrink: 0, width: '24px', height: '24px', color: '#0078D6', marginTop: '4px' }}>
+      <section className="lp-warning-banner">
+        <div className="lp-warning-banner__inner">
+          <div className="lp-warning-banner__icon">
             <AlertTriangle size={24} />
           </div>
-          <div>
-            <h3 style={{ fontSize: '16px', color: '#0f172a', marginBottom: '4px', fontWeight: 600 }}>Open Source Transparency Notice</h3>
-            <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.5 }}>
+          <div className="lp-warning-banner__content">
+            <h3>Open Source Transparency Notice</h3>
+            <p>
               Veil is an open-source project released under the MIT License. It does not phone home, it does not auto-update without consent, and it is strictly driven by the community. We recommend reviewing the source code on GitHub.
             </p>
           </div>
@@ -232,30 +232,30 @@ export default function LandingPage() {
       </section>
 
       {/* Changelog */}
-      <section className="lp-changelog" style={{ padding: '80px 24px', background: '#fdfdfd' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#0078D6', textTransform: 'uppercase', letterSpacing: '1px' }}>Updates</span>
-            <h2 style={{ fontSize: '36px', fontWeight: 800, color: '#0f172a', marginTop: '8px' }}>Release Notes</h2>
-            <p style={{ color: '#64748b', fontSize: '16px', marginTop: '12px' }}>Track the evolution of the Veil Browser project.</p>
+      <section className="lp-changelog">
+        <div className="lp-changelog__inner">
+          <div className="lp-section-header">
+            <span className="lp-section-tag">Updates</span>
+            <h2>Release Notes</h2>
+            <p>Track the evolution of the Veil Browser project.</p>
           </div>
 
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#0078D6' }} />
-              <div style={{ width: '2px', height: '180px', background: '#e2e8f0', marginTop: '8px' }} />
+          <div className="lp-changelog__timeline">
+            <div className="lp-changelog__line-container">
+              <div className="lp-changelog__dot" />
+              <div className="lp-changelog__line" />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Version 1.1 (Pre-Release)</h3>
-                <span style={{ background: '#eef2ff', color: '#0078D6', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>Latest</span>
+            <div className="lp-changelog__content">
+              <div className="lp-changelog__version">
+                <h3>Version 1.1 (Pre-Release)</h3>
+                <span className="lp-changelog__badge">Latest</span>
               </div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#475569', fontSize: '15px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</li>
+              <ul className="lp-changelog__list">
+                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</span></li>
+                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</span></li>
+                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</span></li>
+                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</span></li>
+                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</span></li>
               </ul>
             </div>
           </div>
@@ -263,43 +263,43 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="lp-faq" style={{ padding: '80px 24px', background: '#f8fafc' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#0078D6', textTransform: 'uppercase', letterSpacing: '1px' }}>Support</span>
-            <h2 style={{ fontSize: '36px', fontWeight: 800, color: '#0f172a', marginTop: '8px' }}>Troubleshooting</h2>
+      <section className="lp-faq">
+        <div className="lp-faq__inner">
+          <div className="lp-section-header">
+            <span className="lp-section-tag">Support</span>
+            <h2>Troubleshooting</h2>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+          <div className="lp-faq__list">
+            <div className="lp-faq-card">
+              <div className="lp-faq-card__header">
                 <HelpCircle size={20} color="#0078D6" />
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Windows SmartScreen Warning</h3>
+                <h3>Windows SmartScreen Warning</h3>
               </div>
-              <p style={{ color: '#475569', fontSize: '15px', lineHeight: 1.6, marginBottom: '12px' }}>
+              <p>
                 Because Veil is an independent, open-source project, the `.exe` installer is not signed with an expensive EV certificate. Windows SmartScreen may flag it as an "Unrecognized App".
               </p>
-              <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', fontSize: '14px', color: '#334155' }}>
+              <div className="lp-faq-card__solution">
                 <strong>Solution:</strong> Click <strong>More info</strong> on the blue SmartScreen popup, and then click <strong>Run anyway</strong>. You can verify the integrity of the release by compiling it yourself from the GitHub repository.
               </div>
             </div>
 
-            <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="lp-faq-card">
+              <div className="lp-faq-card__header">
                 <HelpCircle size={20} color="#0078D6" />
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Why is Tor disabled by default?</h3>
+                <h3>Why is Tor disabled by default?</h3>
               </div>
-              <p style={{ color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
+              <p>
                 Tor significantly reduces browsing speeds due to onion routing across global nodes. We leave Tor disabled by default for general browsing, allowing you to manually toggle it ON when you need absolute anonymity.
               </p>
             </div>
             
-            <div style={{ background: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px rgba(0,0,0,0.02)' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="lp-faq-card">
+              <div className="lp-faq-card__header">
                 <HelpCircle size={20} color="#0078D6" />
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>How does Local AI work without a GPU?</h3>
+                <h3>How does Local AI work without a GPU?</h3>
               </div>
-              <p style={{ color: '#475569', fontSize: '15px', lineHeight: 1.6 }}>
+              <p>
                 Veil Browser leverages WebGPU. If a dedicated GPU is unavailable, Transformers.js will automatically fall back to WebAssembly (WASM) CPU execution. While slower, your data will still remain 100% local and secure.
               </p>
             </div>
