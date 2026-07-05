@@ -9,6 +9,11 @@ import History from '../../History';
 import SearchResults from '../../SearchResults';
 import ReaderMode from '../../ReaderMode';
 import FindBar from '../../FindBar';
+import Settings from '../../Settings';
+import Notes from '@/app/Notes';
+import Inspector from '@/app/Inspector';
+import Bookmarks from '@/app/Bookmarks';
+import Passwords from '@/app/Passwords';
 
 export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
   const { tabs, activeId, splitTabId, globalHistory, settings, updateSettings, updateTab, setTabs, findBarOpen, setFindBarOpen } = useBrowserStore();
@@ -17,6 +22,31 @@ export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
   const inactivityTimers = useRef<Record<string, NodeJS.Timeout>>({});
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (!e.data || !e.data.type) return;
+      
+      let sourceTabId = activeId;
+      for (const tab of tabs) {
+        const wv = wvRefs.current[tab.id];
+        if (wv && wv.contentWindow === e.source) {
+          sourceTabId = tab.id;
+          break;
+        }
+      }
+
+      if (e.data.type === 'navigate' && e.data.url) {
+        nav(sourceTabId, e.data.url);
+      } else if (e.data.type === 'page-info' && e.data.title) {
+        updateTab(sourceTabId, { title: e.data.title });
+      } else if (e.data.type === 'favicon' && e.data.url) {
+        updateTab(sourceTabId, { favicon: e.data.url });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeId, nav]);
 
   useEffect(() => {
     if (activeId && inactivityTimers.current[activeId]) {
@@ -60,7 +90,7 @@ export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
               This tab was suspended to conserve memory and keep your browser fast.
             </p>
             <button
-              className="px-8 py-3 rounded-full font-medium text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] transition-all hover:scale-105 active:scale-95 shadow-[var(--glow-primary)]"
+              className="px-8 py-3 rounded-full font-medium glass-btn-accent transition-all shadow-md"
               onClick={() => {
                 setDiscardedTabs(prev => { const next = new Set(prev); next.delete(tab.id); return next; });
                 const wv = wvRefs.current[tab.id];
@@ -75,9 +105,14 @@ export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
       );
     }
 
-    if (tab.url === NEWTAB) return <NewTab onNavigate={(u: string) => nav(tab.id, u)} settings={settings} onToggleSetting={async (k: string, v?: any) => { updateSettings({ [k]: v !== undefined ? v : !(settings as any)[k] }); }} recentHistory={globalHistory.slice(0, 6)} />;
-    if (tab.url === 'browser://downloads') return <Downloads />;
+    if (tab.url === NEWTAB) return <NewTab onNavigate={(u: string) => nav(tab.id, u)} />;
+    if (tab.url === 'veil://downloads') return <Downloads />;
+    if (tab.url === 'veil://notes') return <Notes />;
+    if (tab.url === 'veil://passwords') return <Passwords />;
+    if (tab.url === 'veil://inspector') return <Inspector />;
+    if (tab.url === 'veil://bookmarks') return <Bookmarks onNavigate={(u: string) => nav(tab.id, u)} />;
     if (tab.url === HISTORY) return <History history={globalHistory} onNavigate={(u: string) => nav(tab.id, u)} onClearHistory={clearHistory} />;
+    if (tab.url === 'veil://settings') return <div className="w-full h-full overflow-y-auto bg-white"><Settings settings={settings} onToggle={async (k: string, v?: any) => { updateSettings({ [k]: v !== undefined ? v : !(settings as any)[k] }); }} /></div>;
     if (tab.url.startsWith('search://')) return <SearchResults query={tab.url.replace('search://', '')} onNavigate={(u: string) => nav(tab.id, u)} />;
 
     if (mounted) {
@@ -93,15 +128,31 @@ export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
             </div>
           )}
 
-          <iframe
-            ref={(el) => { if (el) wvRefs.current[tab.id] = el; }}
-            src={`http://127.0.0.1:8181/proxy?url=${encodeURIComponent(tab.url)}`}
-            style={{ width: '100%', height: '100%', border: 'none', display: tab.error || tab.readerMode ? 'none' : 'flex', background: 'white' }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            title={tab.title}
-          />
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              overflow: 'hidden',
+              display: tab.error || tab.readerMode ? 'none' : 'flex',
+            }}
+          >
+            <iframe
+              ref={(el) => { if (el) wvRefs.current[tab.id] = el; }}
+              src={`http://127.0.0.1:8181/proxy?url=${encodeURIComponent(tab.url)}`}
+              style={{
+                width: `${10000 / (tab.zoomLevel || 100)}%`,
+                height: `${10000 / (tab.zoomLevel || 100)}%`,
+                border: 'none',
+                background: 'white',
+                transform: `scale(${(tab.zoomLevel || 100) / 100})`,
+                transformOrigin: '0 0',
+              }}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              title={tab.title}
+            />
+          </div>
 
-          {tab.readerMode && <ReaderMode isOpen={true} onClose={() => updateTab(tab.id, { readerMode: false })} webviewRef={{ current: wvRefs.current[tab.id] }} />}
+          {tab.readerMode && <ReaderMode isOpen={true} onClose={() => updateTab(tab.id, { readerMode: false })} url={tab.url} />}
 
           {/* ── Error State ── */}
           {tab.error && (
@@ -115,7 +166,7 @@ export default function TabWorkspace({ nav, clearHistory, wvRefs }: any) {
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] mb-8 leading-relaxed">{tab.error}</p>
                 <button
-                  className="px-8 py-3 rounded-full font-medium text-white bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] transition-all hover:scale-105 active:scale-95 shadow-[var(--glow-primary)]"
+                  className="px-8 py-3 rounded-full font-medium glass-btn-accent transition-all shadow-md"
                   onClick={() => {
                     const wv = wvRefs.current[tab.id];
                     if (wv) wv.src = wv.src;

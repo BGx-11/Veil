@@ -8,15 +8,15 @@ env.useBrowserCache = true; // IMPORTANT: Must be true so models are downloaded/
 env.backends.onnx.wasm.wasmPaths = '/wasm/';
 
 export const RECOMMENDED_MODELS = [
-  { id: 'Xenova/Qwen1.5-0.5B-Chat', name: 'Qwen 1.5 (0.5B)', desc: 'Fast, balanced performance for general chat.', size: '~300MB' },
+  { id: 'onnx-community/Qwen2.5-0.5B-Instruct', name: 'Qwen 2.5 (0.5B)', desc: 'Extremely smart and capable for its size. Best overall.', size: '~350MB' },
+  { id: 'onnx-community/Llama-3.2-1B-Instruct', name: 'Llama 3.2 (1B)', desc: 'State of the art reasoning, but requires more RAM and takes longer to load.', size: '~800MB' },
+  { id: 'Xenova/Qwen1.5-0.5B-Chat', name: 'Qwen 1.5 (0.5B)', desc: 'Fast, balanced legacy model for general chat.', size: '~300MB' },
   { id: 'Felladrin/onnx-Llama-160M-Chat-v1', name: 'Llama 160M', desc: 'Ultra-lightweight, extremely fast but less capable.', size: '~100MB' },
-  { id: 'Xenova/TinyLlama-1.1B-Chat-v1.0', name: 'TinyLlama 1.1B', desc: 'Smarter and more capable, but slower to load.', size: '~600MB' },
-  { id: 'Xenova/phi-1_5', name: 'Phi 1.5', desc: 'Excellent reasoning for its size, focused on coding and logic.', size: '~800MB' },
 ];
 
 let _generatorPromise: Promise<any> | null = null;
 let _progressCallbacks: Set<(data: any) => void> = new Set();
-let _activeModelId: string = 'Xenova/Qwen1.5-0.5B-Chat';
+let _activeModelId: string = 'onnx-community/Qwen2.5-0.5B-Instruct';
 
 export function getActiveModelId() {
   if (typeof window !== 'undefined') {

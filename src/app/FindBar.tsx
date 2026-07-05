@@ -37,8 +37,22 @@ export default function FindBar({ isOpen, onClose, webviewRef }: FindBarProps) {
       const iframe = webviewRef.current as HTMLIFrameElement;
       const win = iframe.contentWindow;
       if (win) {
+        // Native find just highlights and scrolls
         const found = (win as any).find(text, caseSensitive, !forward, true, false, false, false);
-        setMatchInfo(found ? { activeMatchOrdinal: 1, matches: 1 } : { activeMatchOrdinal: 0, matches: 0 });
+        
+        // Count total matches approximately
+        let totalMatches = 0;
+        if (win.document && win.document.body) {
+          const bodyText = win.document.body.innerText;
+          if (bodyText) {
+            const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escaped, caseSensitive ? 'g' : 'gi');
+            const matches = bodyText.match(regex);
+            totalMatches = matches ? matches.length : 0;
+          }
+        }
+        
+        setMatchInfo(found ? { activeMatchOrdinal: 1, matches: totalMatches || 1 } : { activeMatchOrdinal: 0, matches: 0 });
       }
     } catch (_e) {
       setMatchInfo({ activeMatchOrdinal: 0, matches: 0 });

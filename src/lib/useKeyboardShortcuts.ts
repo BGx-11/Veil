@@ -7,7 +7,8 @@ export function useKeyboardShortcuts(
   nav: (tabId: string, url: string) => void,
   goBack: () => void,
   goFwd: () => void,
-  reload: () => void
+  reload: () => void,
+  wvRefs?: React.MutableRefObject<Record<string, HTMLIFrameElement>>
 ) {
   const {
     tabs,
@@ -22,7 +23,13 @@ export function useKeyboardShortcuts(
     setSplitTabId,
     settings,
     updateSettings,
-    addToast
+    addToast,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    setTabSearchOpen,
+    fullscreen,
+    setFullscreen
   } = useBrowserStore();
 
   useEffect(() => {
@@ -60,7 +67,12 @@ export function useKeyboardShortcuts(
       // Escape
       if (e.key === 'Escape') {
         setFindBarOpen(false);
+        setTabSearchOpen(false);
         if (splitTabId) setSplitTabId(null);
+        if (fullscreen) {
+          setFullscreen(false);
+          safeInvoke('plugin:window|set_fullscreen', { value: false });
+        }
       }
       
       // Ctrl+H — History
@@ -128,7 +140,7 @@ export function useKeyboardShortcuts(
       // Ctrl+D — Bookmark
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
-        if (active && !active.url.startsWith('browser://') && !active.url.startsWith('search://')) {
+        if (active && !active.url.startsWith('veil://') && !active.url.startsWith('search://')) {
           const exists = settings.bookmarks.find(b => b.url === active.url);
           if (exists) {
             updateSettings({ bookmarks: settings.bookmarks.filter(b => b.url !== active.url) });
@@ -145,11 +157,70 @@ export function useKeyboardShortcuts(
         e.preventDefault();
         setSidebarOpen(!sidebarOpen);
       }
+
+      // ── Zoom Controls ──
+      
+      // Ctrl+= or Ctrl++ — Zoom In
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        zoomIn();
+      }
+      
+      // Ctrl+- — Zoom Out
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      }
+      
+      // Ctrl+0 — Reset Zoom
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
+
+      // ── Tab Search ──
+      
+      // Ctrl+Shift+A — Tab Search
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setTabSearchOpen(true);
+      }
+
+      // ── Screenshot ──
+      
+      // Ctrl+Shift+S — Screenshot
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (wvRefs) {
+          import('@/app/ScreenshotTool').then(mod => {
+            mod.captureScreenshot(addToast, wvRefs);
+          });
+        }
+      }
+
+      // ── Print ──
+      
+      // Ctrl+P — Print
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        try {
+          const iframe = wvRefs?.current[activeId];
+          if (iframe?.contentWindow) {
+            iframe.contentWindow.print();
+          } else {
+            window.print();
+          }
+        } catch {
+          window.print();
+        }
+      }
       
       // F11 — Toggle fullscreen
       if (e.key === 'F11') {
         e.preventDefault();
-        safeInvoke('plugin:window|set_fullscreen', { value: true });
+        const newFs = !fullscreen;
+        setFullscreen(newFs);
+        safeInvoke('plugin:window|set_fullscreen', { value: newFs });
       }
     };
     
@@ -159,6 +230,7 @@ export function useKeyboardShortcuts(
     activeId, tabs, addTab, closeTab, reopenClosedTab, 
     setFindBarOpen, splitTabId, setSplitTabId, nav, 
     goBack, goFwd, reload, urlInputRef, settings, 
-    updateSettings, addToast, sidebarOpen, setSidebarOpen
+    updateSettings, addToast, sidebarOpen, setSidebarOpen,
+    zoomIn, zoomOut, resetZoom, setTabSearchOpen, fullscreen, setFullscreen, wvRefs
   ]);
 }

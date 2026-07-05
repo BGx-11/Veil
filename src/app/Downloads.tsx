@@ -1,17 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Download, FolderOpen, AlertCircle, CheckCircle2, Pause, Play, X, Trash2 } from 'lucide-react';
-
-interface DownloadItem {
-  id: string; filename: string; url: string; totalBytes: number;
-  receivedBytes: number; state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
-  savePath: string; startTime?: number; isPaused?: boolean;
-}
+import { useBrowserStore, DownloadItem } from '@/lib/store';
+import { safeInvoke } from '@/lib/ipcLogger';
 
 export default function Downloads() {
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
-
-  useEffect(() => {}, []);
-  const api: any = null;
+  const downloads = useBrowserStore(state => state.downloads);
+  const clearCompletedDownloadsStore = useBrowserStore(state => state.clearCompletedDownloads);
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -42,14 +36,11 @@ export default function Downloads() {
     return `${Math.floor(remaining / 3600)}h ${Math.ceil((remaining % 3600) / 60)}m left`;
   };
 
-  const openFile = (path: string) => api?.openFile(path);
-  const pauseDownload = (id: string) => api?.pauseDownload(id);
-  const resumeDownload = (id: string) => api?.resumeDownload(id);
-  const cancelDownload = (id: string) => api?.cancelDownload(id);
-  const clearCompleted = () => {
-    api?.clearCompletedDownloads();
-    setDownloads(prev => prev.filter(d => d.state === 'progressing'));
-  };
+  const openFile = (path: string) => safeInvoke('open_file', { path });
+  const pauseDownload = (id: string) => safeInvoke('pause_download', { id });
+  const resumeDownload = (id: string) => safeInvoke('resume_download', { id });
+  const cancelDownload = (id: string) => safeInvoke('cancel_download', { id });
+  const clearCompleted = () => clearCompletedDownloadsStore();
 
   const hasCompleted = downloads.some(d => d.state !== 'progressing');
 
@@ -68,8 +59,9 @@ export default function Downloads() {
   }
 
   return (
-    <div className="w-full h-full overflow-y-auto" style={{ background: 'transparent' }}>
-      <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="w-full h-full overflow-y-auto relative" style={{ background: 'transparent' }}>
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-transparent pointer-events-none" />
+      <div className="max-w-3xl mx-auto px-6 py-10 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="flex items-center gap-3 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>

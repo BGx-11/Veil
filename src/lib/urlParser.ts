@@ -4,7 +4,8 @@ import { isInternal } from './store';
  * Robustly parses user input to distinguish between search queries and URLs/IPs.
  */
 export function parseNavigationInput(input: string): string {
-  const raw = input.trim();
+  // Strip surrounding quotes (common when pasting URLs) and whitespace
+  let raw = input.trim().replace(/^["']+|["']+$/g, '').trim();
   if (!raw) return '';
 
   if (raw.startsWith('http://') || raw.startsWith('https://') || isInternal(raw)) {
@@ -21,6 +22,8 @@ export function parseNavigationInput(input: string): string {
     return `https://${raw}`;
   }
 
-  // Otherwise, it's a search query
+  // Otherwise, it's a search query.
+  // Use encodeURIComponent to safely encode the query. This properly handles
+  // special characters like +, #, &, @, etc. that would otherwise break the URL.
   return `search://${encodeURIComponent(raw)}`;
 }

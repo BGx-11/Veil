@@ -38,8 +38,9 @@ export default function History({ history, onNavigate, onClearHistory }: History
   const getDomain = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
 
   return (
-    <div className="w-full h-full overflow-y-auto" style={{ background: 'transparent' }}>
-      <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="w-full h-full overflow-y-auto relative" style={{ background: 'transparent' }}>
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent pointer-events-none" />
+      <div className="max-w-3xl mx-auto px-6 py-10 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="flex items-center gap-3 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>

@@ -14,9 +14,12 @@ import { safeInvoke } from '@/lib/ipcLogger';
 import Toolbar from './components/Toolbar';
 import TabBar from './components/TabBar';
 import TabWorkspace from './components/TabWorkspace';
+import Sidebar from './components/Sidebar';
 import ErrorBoundary from '../ErrorBoundary';
 import Settings from '../Settings';
 import SLMPanel from '../SLMPanel';
+import ZoomIndicator from '../ZoomIndicator';
+import TabSearch from '../TabSearch';
 
 export default function BrowserShell() {
   const {
@@ -39,6 +42,14 @@ export default function BrowserShell() {
       if (t.url === url) return t;
       const newHistory = t.history.slice(0, t.historyIndex + 1);
       newHistory.push(url);
+      
+      // Also add to global history
+      if (!isInternal(url)) {
+        setTimeout(() => {
+          useBrowserStore.getState().addHistoryEntry({ url, title: url, timestamp: Date.now() });
+        }, 0);
+      }
+      
       return { ...t, url, title: url, history: newHistory, historyIndex: newHistory.length - 1, error: undefined, redirectChain: [], readerMode: false };
     }));
   };
@@ -73,23 +84,58 @@ export default function BrowserShell() {
 
   const clearHistory = async () => { setGlobalHistory([]); };
 
-  useKeyboardShortcuts(urlInputRef, nav, goBack, goFwd, reload);
+  useKeyboardShortcuts(urlInputRef, nav, goBack, goFwd, reload, wvRefs);
 
   useEffect(() => {
     setMounted(true);
     loadRecentHistory(500).then(h => setGlobalHistory(h));
     try {
       const savedSettings = localStorage.getItem('veil-settings');
-      if (savedSettings) updateSettings(JSON.parse(savedSettings));
+      if (savedSettings) {
+        // Deep-migrate any remaining browser:// links in settings to veil://
+        const migratedSettingsStr = savedSettings.replace(/browser:\/\//g, 'veil://');
+        const parsed = JSON.parse(migratedSettingsStr);
+        updateSettings(parsed);
+      }
     } catch (e) {}
 
     let unsubResize: Promise<() => void> | undefined;
     let unsubTorLog: Promise<() => void> | undefined;
+    let unsubDownloadStart: Promise<() => void> | undefined;
+    let unsubDownloadProgress: Promise<() => void> | undefined;
     try {
-      unsubResize = listen('window-resized', () => {});
-      unsubTorLog = listen('tor-log', (event: any) => {
-        useBrowserStore.getState().addTorLog(event.payload);
-      });
+      if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        unsubResize = listen('window-resized', () => {});
+        unsubTorLog = listen('tor-log', (event: any) => {
+          const log = event.payload as string;
+          useBrowserStore.getState().addTorLog(log);
+          const currentStatus = useBrowserStore.getState().settings.torStatus;
+          if (log.includes('Bootstrapped 100%')) {
+             useBrowserStore.getState().updateSettings({ torStatus: 'connected' });
+             useBrowserStore.getState().addToast('Tor Network connected securely', 'success');
+          } else if (log.includes('Tor disconnected')) {
+             useBrowserStore.getState().updateSettings({ torStatus: 'disconnected' });
+          } else if (currentStatus !== 'connected') {
+             useBrowserStore.getState().updateSettings({ torStatus: 'connecting' });
+          }
+        });
+        unsubDownloadStart = listen('download-started', (event: any) => {
+          const { id, filename, url, total_bytes } = event.payload;
+          useBrowserStore.getState().addOrUpdateDownload({
+            id, filename, url, totalBytes: total_bytes, receivedBytes: 0, state: 'progressing', savePath: '', startTime: Date.now()
+          });
+          useBrowserStore.getState().addToast(`Started downloading ${filename}`, 'info');
+        });
+        unsubDownloadProgress = listen('download-progress', (event: any) => {
+          const { id, received_bytes, state, save_path } = event.payload;
+          useBrowserStore.getState().addOrUpdateDownload({
+            id, receivedBytes: received_bytes, state, savePath: save_path
+          } as any);
+          if (state === 'completed') {
+            useBrowserStore.getState().addToast(`Download complete`, 'success');
+          }
+        });
+      }
     } catch (e) {
       console.warn('Tauri API not available (likely running in standard browser)');
     }
@@ -97,15 +143,21 @@ export default function BrowserShell() {
     return () => {
       if (unsubResize) unsubResize.then(f => f && f());
       if (unsubTorLog) unsubTorLog.then(f => f && f());
+      if (unsubDownloadStart) unsubDownloadStart.then(f => f && f());
+      if (unsubDownloadProgress) unsubDownloadProgress.then(f => f && f());
     };
   }, []);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem('veil-settings', JSON.stringify(settings));
+    if (mounted) {
+      localStorage.setItem('veil-settings', JSON.stringify(settings));
+      safeInvoke('sync_privacy_settings', { settings });
+    }
   }, [settings, mounted]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', settings.darkMode ? 'dark' : 'light');
+    // Data theme is always light per user preference (no dark mode needed)
+    document.documentElement.setAttribute('data-theme', 'light');
   }, [settings.darkMode]);
 
   useEffect(() => {
@@ -159,11 +211,18 @@ export default function BrowserShell() {
   const toggleSetting = async (key: string, value?: any) => {
     const newVal = value !== undefined ? value : !(settings as any)[key];
     if (key === 'torMode') {
+      updateSettings({ torStatus: newVal ? 'connecting' : 'disconnected' });
       const res: any = await safeInvoke('toggle_tor', { enable: newVal });
       if (res && typeof res === 'string') {
         updateSettings({ torMode: newVal });
-        addToast(newVal ? 'Tor Network connected' : 'Tor Network disconnected', newVal ? 'success' : 'info');
+        if (!newVal) {
+          updateSettings({ torStatus: 'disconnected' });
+          addToast('Tor Network disconnected', 'info');
+        } else {
+          addToast('Connecting to Tor Network...', 'info');
+        }
       } else {
+        updateSettings({ torMode: false, torStatus: 'disconnected' });
         setTorError(typeof res === 'object' && res?.error ? res.error : 'Unknown Tor Error');
       }
     } else {
@@ -175,41 +234,78 @@ export default function BrowserShell() {
 
   return (
     <ErrorBoundary>
-      <div className="flex w-screen h-screen overflow-hidden bg-[var(--bg-page)] text-[var(--text-primary)]">
-        <Toaster theme={settings.darkMode ? 'dark' : 'light'} position="bottom-right" richColors />
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <TabBar />
-          <Toolbar
-            urlInputRef={urlInputRef}
-            urlInput={urlInput}
-            setUrlInput={setUrlInput}
-            nav={nav}
-            goBack={goBack}
-            goFwd={goFwd}
-            reload={reload}
-            setIsSettingsOpen={setIsSettingsOpen}
-          />
-
-          <div className="flex-1 relative p-2 md:p-3">
-            <TabWorkspace nav={nav} clearHistory={clearHistory} wvRefs={wvRefs} />
-            <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} currentContext={slmContext} />
+      <div className="flex flex-col w-screen h-screen overflow-hidden bg-transparent text-[var(--text-primary)]">
+        
+        {/* Custom Titlebar (Drag Region & Window Controls) */}
+        <div data-tauri-drag-region className="h-8 flex items-center justify-between px-3 flex-shrink-0 drag-region z-50">
+          <div className="w-[52px]" /> {/* Spacer for centering */}
+          
+          <div className="text-[11px] font-medium text-[var(--text-tertiary)] pointer-events-none select-none tracking-widest uppercase">
+            Veil Browser
+          </div>
+          
+          {/* Windows style Window Controls (Right side) */}
+          <div className="flex items-center gap-2 no-drag">
+            <button onClick={() => safeInvoke('minimize_window')} className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-sm shadow-yellow-400/50 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-yellow-900 leading-none">−</span>
+            </button>
+            <button onClick={() => safeInvoke('maximize_window')} className="w-3 h-3 rounded-full bg-green-400 hover:bg-green-500 shadow-sm shadow-green-400/50 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-green-900 leading-none">+</span>
+            </button>
+            <button onClick={() => safeInvoke('close_window')} className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 shadow-sm shadow-red-400/50 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-red-900 leading-none">✕</span>
+            </button>
           </div>
         </div>
+
+        <Toaster position="bottom-right" richColors />
+
+        {/* Main Interface Layout */}
+        <div className="flex-1 flex min-h-0 px-2 sm:px-3 pb-2 sm:pb-3 gap-2 sm:gap-3">
+          
+          {/* Sidebar (Hidden on very small screens) */}
+          <div className="hidden sm:block">
+            <Sidebar />
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden p-1 sm:p-2">
+            <TabBar />
+            <Toolbar
+              urlInputRef={urlInputRef}
+              urlInput={urlInput}
+              setUrlInput={setUrlInput}
+              nav={nav}
+              goBack={goBack}
+              goFwd={goFwd}
+              reload={reload}
+              setIsSettingsOpen={setIsSettingsOpen}
+            />
+
+            <div className="flex-1 relative glass-panel overflow-hidden rounded-xl mt-2 border border-[var(--glass-border)]">
+              <TabWorkspace nav={nav} clearHistory={clearHistory} wvRefs={wvRefs} />
+              <ZoomIndicator />
+              <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} currentContext={slmContext} />
+            </div>
+          </div>
+
+        </div>
+
+        {/* Tab Search Overlay */}
+        <TabSearch />
 
         {/* Settings Modal */}
         <AnimatePresence>
           {isSettingsOpen && (
             <motion.div
-              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-white/30 backdrop-blur-sm"
               onClick={() => setIsSettingsOpen(false)}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+                className="glass-panel-heavy w-full max-w-2xl max-h-[85vh] overflow-y-auto p-4"
                 onClick={e => e.stopPropagation()}
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -225,25 +321,25 @@ export default function BrowserShell() {
         <AnimatePresence>
           {torError && (
             <motion.div
-              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-white/30 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="glass-panel p-8 max-w-md text-center flex flex-col items-center gap-4"
+                className="glass-panel-heavy p-8 max-w-md text-center flex flex-col items-center gap-4"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
               >
-                <div className="w-16 h-16 rounded-full flex items-center justify-center bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center glass-panel text-red-500">
                   <Shield size={32} />
                 </div>
                 <h2 className="text-xl font-semibold">Tor Connection Failed</h2>
                 <p className="text-sm text-[var(--text-secondary)]">{torError}</p>
                 <button
                   onClick={() => setTorError('')}
-                  className="px-6 py-2.5 rounded-full font-medium bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)] transition-colors mt-2"
+                  className="px-6 py-2.5 glass-btn-accent rounded-full font-medium mt-2 shadow-sm"
                 >
                   Dismiss
                 </button>

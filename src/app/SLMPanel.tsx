@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, Sparkles, X, Loader2, Trash, Settings, Download, ChevronDown, Square, Languages } from 'lucide-react';
+import { Bot, Send, Sparkles, X, Loader2, Trash, Settings, Download, ChevronDown, Square, Languages, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import { getSLMPipeline, removeSLMProgressCallback, RECOMMENDED_MODELS, getActiveModelId, setActiveModelId } from '@/lib/slm';
+import { useBrowserStore } from '@/lib/store';
 
 interface Message { role: 'user' | 'assistant' | 'system'; content: string; }
 
 export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: boolean, onClose: () => void, currentContext?: string }) {
+  const { settings, updateSettings } = useBrowserStore();
   const [messages, setMessages] = useState<Message[]>([{ role: 'assistant', content: 'Hello! I am Veil AI. How can I help you today?' }]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -24,10 +26,10 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !settings.slmConsent) return;
     setCurrentModel(getActiveModelId());
     initModel();
-  }, [isOpen]);
+  }, [isOpen, settings.slmConsent]);
 
   const initModel = async () => {
     let alive = true;
@@ -67,7 +69,7 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
 
     try {
       if (generatorRef.current && !modelError) {
-        const systemPrompt = `You are Veil AI. Keep responses under 50 words unless asked. Just answer directly.`;
+        const systemPrompt = `You are Veil AI, an advanced, secure, and highly intelligent browser assistant. Your primary goal is to provide accurate, helpful, and exceptionally well-reasoned answers based on the context provided. Think step-by-step and be concise but thorough. Keep responses concise unless asked for details.`;
         const messagesArray = [
           { role: 'system', content: systemPrompt },
           ...messages.filter(m => m.role !== 'system'),
@@ -98,12 +100,13 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
 
   const handleStop = () => abortController?.abort();
   const translatePage = () => handleSend(undefined, "Please translate the content of this page to English.");
+  const summarizePage = () => handleSend(undefined, "Please summarize the content of this page.");
 
   if (!isOpen) return null;
 
   return (
     <motion.div
-      className="absolute top-0 right-0 h-full flex flex-col z-40 flex-shrink-0 bg-[var(--bg-element)]/80 backdrop-blur-2xl border-l border-[var(--border-color)] shadow-2xl"
+      className="absolute top-0 right-0 h-full flex flex-col z-40 flex-shrink-0 glass-panel-heavy border-l border-white/20 shadow-[-10px_0_30px_rgba(0,0,0,0.05)]"
       style={{ width: '380px' }}
       initial={{ x: '100%' }}
       animate={{ x: 0 }}
@@ -111,35 +114,42 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
       transition={{ type: 'spring', stiffness: 400, damping: 40 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 flex-shrink-0 border-b border-[var(--border-color)] bg-transparent">
+      <div className="flex items-center justify-between px-5 py-4 flex-shrink-0 bg-transparent">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="flex items-center gap-2 px-2 py-1 -ml-2 rounded-lg hover:bg-[var(--surface-icon-hover)] transition-colors"
+          className="flex items-center gap-2 px-3 py-2 -ml-2 rounded-xl glass-btn transition-colors"
         >
           <Sparkles size={16} className="text-[var(--accent-primary)]" />
           <span className="font-semibold text-[14px] text-[var(--text-primary)]">Veil AI</span>
           <ChevronDown size={14} className={`text-[var(--text-tertiary)] transition-transform ${showSettings ? 'rotate-180' : ''}`} />
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={summarizePage}
+            title="Summarize Page"
+            className="w-8 h-8 flex items-center justify-center rounded-xl glass-btn text-[var(--text-secondary)] transition-colors hover:text-[var(--accent-primary)]"
+          >
+            <FileText size={14} />
+          </button>
           <button
             onClick={translatePage}
             title="Translate Page"
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--surface-icon-bg)] text-[var(--text-secondary)] transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-xl glass-btn text-[var(--text-secondary)] transition-colors"
           >
             <Languages size={14} />
           </button>
           <button
             onClick={() => setMessages([{ role: 'assistant', content: 'Hello! I am Veil AI. How can I help you today?' }])}
             title="Clear Chat"
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--surface-icon-bg)] text-[var(--text-secondary)] transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-xl glass-btn text-[var(--text-secondary)] transition-colors"
           >
             <Trash size={14} />
           </button>
-          <div className="w-px h-4 mx-1 bg-[var(--border-color)]" />
+          <div className="w-px h-6 bg-slate-300 opacity-30" />
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-500 hover:text-white text-[var(--text-secondary)] transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-xl glass-btn text-[var(--accent-danger)] transition-colors hover:text-red-600"
           >
             <X size={16} />
           </button>
@@ -156,21 +166,21 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-2">Available Models</h4>
+              <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-2 px-1">Available Models</h4>
               {RECOMMENDED_MODELS.map(model => (
                 <button
                   key={model.id}
                   onClick={() => switchModel(model.id)}
-                  className={`p-4 rounded-xl text-left border transition-all
+                  className={`p-4 rounded-2xl text-left transition-all
                     ${currentModel === model.id 
-                      ? 'bg-[var(--accent-primary)]/10 border-[var(--accent-primary)]' 
-                      : 'bg-[var(--bg-base)] border-[var(--border-color)] hover:border-[var(--text-tertiary)]'}`}
+                      ? 'glass-panel shadow-inner text-[var(--accent-primary)] border border-indigo-200/50' 
+                      : 'glass-btn text-[var(--text-primary)]'}`}
                 >
                   <div className="flex justify-between items-center mb-1">
                     <span className={`font-semibold text-sm ${currentModel === model.id ? 'text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'}`}>
                       {model.name}
                     </span>
-                    <span className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-icon-bg)] px-2 py-0.5 rounded-full">{model.size}</span>
+                    <span className="text-xs text-[var(--text-tertiary)] opacity-70 px-2 py-0.5 rounded-full glass-panel">{model.size}</span>
                   </div>
                   <p className="text-xs text-[var(--text-secondary)]">{model.desc}</p>
                 </button>
@@ -206,15 +216,15 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
         {modelReady && !showSettings && messages.map((m, i) => (
           <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
             {m.role === 'assistant' && (
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-[var(--surface-icon-bg)] text-[var(--accent-primary)]">
-                <Bot size={16} />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 glass-panel shadow-inner text-[var(--accent-primary)]">
+                <Bot size={18} />
               </div>
             )}
             <div
-              className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${
+              className={`px-5 py-3.5 max-w-[85%] ${
                 m.role === 'user' 
-                  ? 'bg-[var(--accent-primary)] text-white rounded-tr-sm' 
-                  : 'bg-[var(--bg-element)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-tl-sm'
+                  ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-md rounded-2xl rounded-tr-md' 
+                  : 'glass-panel text-[var(--text-primary)] rounded-2xl rounded-tl-md shadow-sm'
               }`}
             >
               {m.role === 'assistant' ? (
@@ -222,7 +232,7 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
                   <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{m.content}</ReactMarkdown>
                 </div>
               ) : (
-                <span className="text-sm">{m.content}</span>
+                <span className="text-sm font-medium">{m.content}</span>
               )}
             </div>
           </div>
@@ -249,36 +259,66 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
       {/* Input Area */}
       <form
         onSubmit={handleSend}
-        className="p-4 bg-[var(--bg-element)] border-t border-[var(--border-color)] flex gap-2"
+        className="p-5 flex gap-3"
         style={{ opacity: showSettings ? 0.5 : 1, pointerEvents: showSettings ? 'none' : 'auto' }}
       >
-        <input
-          type="text" 
-          value={input} 
-          onChange={e => setInput(e.target.value)}
-          placeholder={modelReady ? "Message Veil AI..." : "Engine loading..."}
-          disabled={!modelReady || showSettings}
-          className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-[var(--bg-base)] border border-transparent focus:bg-[var(--bg-element)] focus:border-[var(--accent-primary)] outline-none transition-all text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
-        />
+        <div className="flex-1 glass-input rounded-2xl flex items-center">
+          <input
+            type="text" 
+            value={input} 
+            onChange={e => setInput(e.target.value)}
+            placeholder={modelReady ? "Message Veil AI..." : "Engine loading..."}
+            disabled={!modelReady || showSettings}
+            className="w-full px-5 py-3.5 bg-transparent border-none outline-none text-[14px] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] font-medium"
+          />
+        </div>
         {isTyping ? (
           <button
             type="button"
             onClick={handleStop}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors"
+            className="w-12 h-12 flex items-center justify-center rounded-2xl glass-btn text-red-500 hover:text-red-600 transition-colors shadow-sm"
             title="Stop Generation"
           >
-            <Square size={14} fill="currentColor" />
+            <Square size={16} fill="currentColor" />
           </button>
         ) : (
           <button
             type="submit"
             disabled={!input.trim() || !modelReady || showSettings}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="w-12 h-12 flex items-center justify-center rounded-2xl glass-btn-accent text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-md"
           >
-            <Send size={16} className="ml-0.5" />
+            <Send size={18} className="ml-1" />
           </button>
         )}
       </form>
+      
+      {/* Consent Screen Overlay */}
+      {!settings.slmConsent && (
+        <div className="absolute inset-0 z-50 bg-[var(--bg-element)]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 rounded-full glass-panel shadow-lg flex items-center justify-center text-[var(--accent-primary)] mb-6">
+            <Sparkles size={32} />
+          </div>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Enable Veil AI</h2>
+          <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
+            Veil AI runs a Small Language Model (SLM) entirely in your browser using WebGPU for ultimate privacy. 
+            The initial download will require approximately <strong>~350MB - 800MB</strong> depending on the model.
+          </p>
+          <div className="flex flex-col gap-3 w-full max-w-[250px]">
+            <button 
+              onClick={() => updateSettings({ slmConsent: true })}
+              className="w-full py-3 rounded-xl glass-btn-accent text-white font-semibold transition-transform active:scale-95"
+            >
+              Download & Enable AI
+            </button>
+            <button 
+              onClick={onClose}
+              className="w-full py-3 rounded-xl glass-btn text-[var(--text-tertiary)] font-medium transition-colors hover:text-[var(--text-primary)]"
+            >
+              Not Right Now
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

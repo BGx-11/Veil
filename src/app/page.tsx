@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Shield, Download, Lock, Globe, Zap, Bot, EyeOff, ChevronDown, Fingerprint, Wifi, Eye, BookOpen, Columns2, Search, X, AlertTriangle, CheckCircle2, GitCommit, HelpCircle, MessageSquare, Mail } from 'lucide-react';
+import { Shield, Download, Lock, Globe, Zap, Bot, EyeOff, ChevronDown, Fingerprint, Wifi, Eye, BookOpen, Columns2, Search, X, AlertTriangle, CheckCircle2, GitCommit, HelpCircle, MessageSquare, Mail, User, LayoutGrid, Heart, Clock, MoreHorizontal } from 'lucide-react';
 import './landing.css';
 
 const GithubIcon = ({ size = 20 }: { size?: number }) => (
@@ -100,24 +100,77 @@ export default function LandingPage() {
 
         {/* Browser Mockup */}
         <div className="lp-mockup">
-          <div className="lp-mockup__bar">
-            <div className="lp-mockup__dots"><span /><span /><span /></div>
-            <div className="lp-mockup__url"><Lock size={11} /> veil://newtab</div>
-            <div className="lp-mockup__actions">
-              <Shield size={12} />
-            </div>
-          </div>
-          <div className="lp-mockup__body">
+          <div className="lp-mockup__window">
             <div className="lp-mockup__sidebar">
-              <div className="mock-tab mock-tab--active" />
-              <div className="mock-tab" />
-              <div className="mock-tab" />
+              <div className="mock-sidebar-top">
+                <div className="mock-window-controls">
+                  <span className="dot dot-close" />
+                  <span className="dot dot-min" />
+                  <span className="dot dot-max" />
+                </div>
+                <div className="mock-sidebar-user"><User size={16} /></div>
+                <div className="mock-sidebar-apps">
+                  <div className="mock-app text-indigo-600"><Globe size={18} /></div>
+                  <div className="mock-app text-purple-600"><Bot size={18} /></div>
+                  <div className="mock-app text-teal-600"><LayoutGrid size={18} /></div>
+                </div>
+              </div>
+              <div className="mock-sidebar-bottom">
+                <Heart size={16} className="text-[var(--text-tertiary)]" />
+                <Clock size={16} className="text-[var(--text-tertiary)]" />
+                <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
+              </div>
             </div>
-            <div className="lp-mockup__content">
-              <div className="mock-search-bar" />
-              <div className="mock-grid">
-                <div className="mock-card" /><div className="mock-card" />
-                <div className="mock-card" /><div className="mock-card" />
+            
+            <div className="lp-mockup__main">
+              <div className="lp-mockup__toolbar">
+                 <div className="mock-toolbar-nav">
+                   <div className="mock-nav-btn"><ChevronDown size={16} style={{transform: 'rotate(90deg)'}} /></div>
+                   <div className="mock-nav-btn"><ChevronDown size={16} style={{transform: 'rotate(-90deg)'}} /></div>
+                   <div className="mock-nav-btn"><Search size={14} /></div>
+                 </div>
+                 <div className="mock-toolbar-address">
+                   <div className="mock-address-inner">
+                     <Shield size={14} className="text-emerald-400" />
+                     <Lock size={12} className="text-[var(--text-tertiary)]" />
+                     <span className="text-[var(--text-secondary)]">https://</span><span className="text-[var(--text-primary)]">veil.browser</span>
+                   </div>
+                 </div>
+                 <div className="mock-toolbar-actions">
+                   <div className="mock-tor-badge">
+                     <span className="mock-tor-dot"></span>
+                     Connected
+                   </div>
+                 </div>
+              </div>
+              
+              <div className="lp-mockup__tabs">
+                <div className="mock-tab mock-tab--active">
+                  <Globe size={12} className="text-indigo-400"/> <span>Veil Search</span>
+                </div>
+                <div className="mock-tab">
+                  <Shield size={12} className="text-emerald-600"/> <span>Privacy Report</span>
+                </div>
+                <div className="mock-tab-new">
+                   +
+                </div>
+              </div>
+
+              <div className="lp-mockup__content">
+                 <div className="mock-webpage">
+                   <div className="mock-hero">
+                     <div className="mock-hero-title">Private Search</div>
+                     <div className="mock-search-box">
+                       <Search size={18} className="text-[var(--text-tertiary)]" />
+                       <span>Search without being tracked...</span>
+                     </div>
+                   </div>
+                   <div className="mock-cards">
+                     <div className="mock-card"></div>
+                     <div className="mock-card"></div>
+                     <div className="mock-card"></div>
+                   </div>
+                 </div>
               </div>
             </div>
           </div>
@@ -194,14 +247,15 @@ export default function LandingPage() {
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Version 1.0 (Current)</h3>
+                <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a' }}>Version 1.1 (Pre-Release)</h3>
                 <span style={{ background: '#eef2ff', color: '#0078D6', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600 }}>Latest</span>
               </div>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, color: '#475569', fontSize: '15px', lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Core:</strong> Integrated Tor SOCKS5 network routing natively without external daemons.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>AI Engine:</strong> WebGPU-accelerated local summarization using Transformers.js.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Privacy:</strong> Ghostery Tracker blocker engine fully integrated into the native Rust proxy layer.</li>
-                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>UI:</strong> Next.js 15 React architecture implemented for maximum performance.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</li>
+                <li style={{ display: 'flex', gap: '8px' }}><CheckCircle2 size={18} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }}/> <strong>Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</li>
               </ul>
             </div>
           </div>
@@ -330,8 +384,8 @@ export default function LandingPage() {
                       setDownloadState('completed');
                       // Trigger actual download
                       const link = document.createElement('a');
-                      link.href = 'https://github.com/BGx-11/Veil/releases/latest/download/Veil_Setup_v1.exe';
-                      link.download = 'Veil_Setup_v1.exe';
+                      link.href = 'https://github.com/BGx-11/Veil/releases/download/v1.1/Veil_1.1.0_x64_en-US.msi';
+                      link.download = 'Veil_1.1.0_x64_en-US.msi';
                       document.body.appendChild(link);
                       link.click();
                       document.body.removeChild(link);

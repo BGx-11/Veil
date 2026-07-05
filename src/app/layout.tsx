@@ -50,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
+    <html lang="en" data-theme="light" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <head>
         <link rel="icon" href="/logo.png" type="image/png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

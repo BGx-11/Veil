@@ -7,6 +7,10 @@ import { useBrowserStore } from './store';
  */
 export async function safeInvoke<T>(cmd: string, args?: any): Promise<T | null> {
   try {
+    if (typeof window !== 'undefined' && !(window as any).__TAURI_INTERNALS__) {
+      console.warn(`[Tauri Mock] ${cmd} called but Tauri is not available in this environment.`);
+      return null;
+    }
     const result = await invoke<T>(cmd, args);
     return result;
   } catch (error: any) {
@@ -25,6 +29,9 @@ export async function safeInvoke<T>(cmd: string, args?: any): Promise<T | null> 
  * like closing a window where we don't care about the result.
  */
 export function fireInvoke(cmd: string, args?: any): void {
+  if (typeof window !== 'undefined' && !(window as any).__TAURI_INTERNALS__) {
+    return;
+  }
   invoke(cmd, args).catch((error) => {
     console.error(`[IPC Error (Fire & Forget)] Failed to invoke '${cmd}':`, error);
   });

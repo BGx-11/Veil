@@ -6,7 +6,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-1.0-blueviolet?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.1-blueviolet?style=for-the-badge)
 
 **Official Site**: [veil.iambgx.in](https://veil.iambgx.in)
 
@@ -22,9 +22,22 @@ Veil is an ultra-lightweight, privacy-hardened desktop browser built entirely wi
 
 ---
 
+## 📋 Changelog — v1.1 (Pre-Release)
+
+### 🆕 Features & Updates
+| Feature | Description |
+|---------|-------------|
+| **Tor Connection UI** | Real-time Tor progress indicator and connection status feedback right in the toolbar. |
+| **Export/Import Settings** | Sync your privacy controls, speed dials, and configurations seamlessly via local JSON backups. |
+| **Accurate Mockups & UI** | Overhauled landing page to reflect the browser's beautiful, unified light theme accurately. |
+| **Enhanced Proxy Layer** | Rust-based CORS filtering added to seamlessly iframe websites via proxy. |
+| **Stability Improvements** | Fixed IPC communication bugs on website load and stabilized in-memory history persistence. |
+
+---
+
 ## 📋 Changelog — v1.0
 
-### 🆕 Features
+### 🆕 Core Features
 | Feature | Description |
 |---------|-------------|
 | **Ultra-Lightweight Core** | Built on Tauri and Rust, producing a blazingly fast ~15MB binary with minimal memory usage. |

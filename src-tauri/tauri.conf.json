@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "veil-browser",
-  "version": "0.1.0",
+  "productName": "Veil",
+  "version": "1.1.0",
   "identifier": "com.veil.browser",
   "build": {
     "frontendDist": "../out",
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: veil: http://localhost:8181 http://127.0.0.1:8181 https://*; connect-src 'self' data: blob: http://localhost:8181 http://127.0.0.1:8181 https://* ws://localhost:*"
     }
   },
   "bundle": {
