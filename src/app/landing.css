@@ -744,28 +744,7 @@ html:has(.lp-modal-open), body:has(.lp-modal-open) {
   }
   .lp-stats__grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .lp-privacy__features { grid-template-columns: 1fr; }
-  .lp-mockup__sidebar { display: none; }
-  .lp-mockup__window {
-    height: 400px;
-  }
-  .mock-toolbar-actions {
-    display: none;
-  }
-  .mock-address-inner {
-    max-width: none;
-  }
-  .mock-cards {
-    grid-template-columns: 1fr;
-  }
-  .mock-webpage {
-    gap: 20px;
-  }
-  .mock-hero-title {
-    font-size: 24px;
-  }
-  .lp-mockup__content {
-    padding: 20px;
-  }
+  .lp-mockup { display: none; }
   .lp-footer__bottom {
     flex-direction: column;
     text-align: center;
