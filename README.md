@@ -29,7 +29,7 @@ Veil is an ultra-lightweight, privacy-hardened desktop browser built entirely wi
 |---------|-------------|
 | **Tor Connection UI** | Real-time Tor progress indicator and connection status feedback right in the toolbar. |
 | **Export/Import Settings** | Sync your privacy controls, speed dials, and configurations seamlessly via local JSON backups. |
-| **Accurate Mockups & UI** | Overhauled landing page to reflect the browser's beautiful, unified light theme accurately. |
+| **Accurate Mockups & UI** | Completely overhauled the landing page with a dynamic Aurora background and faster animations. |
 | **Enhanced Proxy Layer** | Rust-based CORS filtering added to seamlessly iframe websites via proxy. |
 | **Stability Improvements** | Fixed IPC communication bugs on website load and stabilized in-memory history persistence. |
 

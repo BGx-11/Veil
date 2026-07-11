@@ -230,7 +230,7 @@ export default function LandingPage() {
                 <li><strong className="text-zinc-900 dark:text-zinc-200">Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</li>
                 <li><strong className="text-zinc-900 dark:text-zinc-200">Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</li>
                 <li><strong className="text-zinc-900 dark:text-zinc-200">Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</li>
-                <li><strong className="text-zinc-900 dark:text-zinc-200">UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</li>
+                <li><strong className="text-zinc-900 dark:text-zinc-200">UI & Design:</strong> Completely overhauled the landing page with a dynamic Aurora background and faster animations.</li>
                 <li><strong className="text-zinc-900 dark:text-zinc-200">Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</li>
               </ul>
             </div>
