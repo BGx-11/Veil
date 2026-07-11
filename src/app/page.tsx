@@ -70,17 +70,17 @@ export default function LandingPage() {
                 Veil
               </span>
             </div>
-            <div className="flex items-center gap-8">
-              <Link href="#features" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+            <div className="flex items-center gap-4 sm:gap-6 md:gap-8">
+              <Link href="#features" className="hidden sm:block text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
                 Features
               </Link>
-              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors flex items-center gap-2 group">
+              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="hidden sm:flex text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors items-center gap-2 group">
                 <GitBranch className="w-4 h-4 group-hover:scale-110 transition-transform" /> Source
               </a>
-              <a href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Browser_Setup.exe" className="relative overflow-hidden group bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
+              <a href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Browser_Setup.exe" className="relative overflow-hidden group bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                 <span className="relative z-10 flex items-center gap-2 group-hover:text-white transition-colors duration-300">
-                  <Download className="w-4 h-4" /> Download
+                  <Download className="w-4 h-4" /> <span>Download</span>
                 </span>
               </a>
             </div>
@@ -94,15 +94,8 @@ export default function LandingPage() {
             animate="visible"
             className="flex-1 flex flex-col items-center justify-center text-center max-w-5xl mx-auto px-4 pt-32 pb-20"
           >
-            <motion.div variants={itemVariants} className="inline-flex items-center px-4 py-2 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 bg-white/20 dark:bg-black/20 backdrop-blur-xl mb-8 shadow-sm">
-              <span className="relative flex h-2.5 w-2.5 mr-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
-              </span>
-              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Veil 2.0 Desktop is now available</span>
-            </motion.div>
-            
-            <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-extrabold tracking-tight text-zinc-900 dark:text-white max-w-4xl leading-[1.1] mb-6">
+
+            <motion.h1 variants={itemVariants} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-zinc-900 dark:text-white max-w-4xl leading-[1.1] sm:leading-[1.1] mb-6">
               Browse beyond <br />
               <span className="relative inline-block">
                 <span className="absolute -inset-1 blur-2xl bg-gradient-to-r from-indigo-600 to-purple-500 opacity-40 dark:opacity-30 rounded-full"></span>
@@ -112,16 +105,16 @@ export default function LandingPage() {
               </span>
             </motion.h1>
             
-            <motion.p variants={itemVariants} className="text-xl md:text-2xl text-zinc-600 dark:text-zinc-400 max-w-2xl mt-4 leading-relaxed font-light">
+            <motion.p variants={itemVariants} className="text-lg sm:text-xl md:text-2xl text-zinc-600 dark:text-zinc-400 max-w-2xl mt-4 leading-relaxed font-light">
               The private, AI-powered desktop browser. Featuring on-device summarization, integrated tracking protection, and seamless Tor routing.
             </motion.p>
             
-            <motion.div variants={itemVariants} className="flex flex-col items-center gap-6 mt-12 w-full">
+            <motion.div variants={itemVariants} className="flex flex-col items-center gap-6 mt-12 w-full px-4 sm:px-0">
               <motion.a 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Browser_Setup.exe" 
-                className="relative overflow-hidden group bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-5 rounded-full text-xl font-bold flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(79,70,229,0.5)] text-white w-full sm:w-auto"
+                className="relative overflow-hidden group bg-gradient-to-r from-indigo-600 to-purple-600 px-8 sm:px-10 py-4 sm:py-5 rounded-full text-lg sm:text-xl font-bold flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(79,70,229,0.5)] text-white w-full sm:w-auto"
               >
                 <div className="absolute inset-0 w-full h-full bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
                 <Download className="w-6 h-6 relative z-10" />
@@ -147,7 +140,7 @@ export default function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             className="text-center mb-20"
           >
-            <motion.h2 variants={featureItemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-white mb-4">
+            <motion.h2 variants={featureItemVariants} className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-white mb-4">
               Everything you need. <span className="text-accent-primary">Nothing you don't.</span>
             </motion.h2>
           </motion.div>
@@ -157,7 +150,7 @@ export default function LandingPage() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
           >
             {/* Feature Cards */}
             <FeatureCard icon={<Ghost />} title="Ghostery Blocker" desc="Network-level ad & tracker blocking. Stops scripts before they even load." color="from-blue-500/10 to-indigo-500/10" textCol="text-blue-500" />
@@ -176,10 +169,10 @@ export default function LandingPage() {
         <section className="py-24 bg-zinc-100/50 dark:bg-zinc-900/30 border-y border-zinc-200 dark:border-zinc-800">
           <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center gap-12">
             <div className="md:w-1/2">
-              <h2 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-6">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-6">
                 Your data stays <span className="text-accent-primary">yours.</span>
               </h2>
-              <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
+              <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
                 Unlike Chrome, Edge, or Safari — Veil doesn't collect telemetry, sync your history to corporate servers, or sell your search queries to advertisers. Every AI inference runs on your GPU. Every search is private. Every session is ephemeral.
               </p>
               <ul className="space-y-4">
@@ -276,10 +269,10 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-3">
               <Image src="/logo.png" alt="Veil Logo" width={32} height={32} className="rounded-lg opacity-80" />
-              <span className="text-zinc-500 font-semibold tracking-tight">Veil Browser © {new Date().getFullYear()}</span>
+              <span className="text-zinc-500 font-semibold tracking-tight text-center sm:text-left">Veil Browser © {new Date().getFullYear()}</span>
             </div>
             
-            <div className="flex items-center gap-6 text-sm font-medium text-zinc-500">
+            <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-6 text-sm font-medium text-zinc-500">
               <Link href="/terms" className="hover:text-accent-primary transition-colors">Terms & Conditions</Link>
               <Link href="/privacy" className="hover:text-accent-primary transition-colors">Privacy Policy</Link>
               <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="hover:text-accent-primary transition-colors">GitHub</a>
