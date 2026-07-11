@@ -77,7 +77,7 @@ export default function LandingPage() {
               <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors flex items-center gap-2 group">
                 <GitBranch className="w-4 h-4 group-hover:scale-110 transition-transform" /> Source
               </a>
-              <a href="/Veil_Browser_Setup.exe" download className="relative overflow-hidden group bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
+              <a href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Browser_Setup.exe" className="relative overflow-hidden group bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
                 <span className="relative z-10 flex items-center gap-2 group-hover:text-white transition-colors duration-300">
                   <Download className="w-4 h-4" /> Download
@@ -112,8 +112,7 @@ export default function LandingPage() {
               <motion.a 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                href="/Veil_Browser_Setup.exe" 
-                download
+                href="https://github.com/BGx-11/Veil/releases/latest/download/Veil_Browser_Setup.exe" 
                 className="relative overflow-hidden group bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-5 rounded-full text-xl font-bold flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(79,70,229,0.5)] text-white w-full sm:w-auto"
               >
                 <div className="absolute inset-0 w-full h-full bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
