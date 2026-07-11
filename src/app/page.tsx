@@ -215,8 +215,8 @@ export default function LandingPage() {
             <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 pl-8 pb-8">
               <span className="absolute -left-2.5 top-0 w-5 h-5 rounded-full bg-accent-primary border-4 border-white dark:border-zinc-950"></span>
               <div className="flex items-center gap-3 mb-4">
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Version 1.1 (Pre-Release)</h3>
-                <span className="bg-accent-primary/10 text-accent-primary text-xs px-2 py-1 rounded-full font-bold">Latest</span>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Version 2.0</h3>
+                <span className="bg-indigo-500/10 text-indigo-500 text-xs px-2 py-1 rounded-full font-bold">Latest</span>
               </div>
               <ul className="space-y-4 text-zinc-600 dark:text-zinc-400">
                 <li><strong className="text-zinc-900 dark:text-zinc-200">Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</li>
