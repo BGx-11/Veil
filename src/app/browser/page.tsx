@@ -8,13 +8,14 @@ import { listen } from '@tauri-apps/api/event';
 
 import { useBrowserStore, NEWTAB, HISTORY, isInternal } from '@/lib/store';
 import { useKeyboardShortcuts } from '@/lib/useKeyboardShortcuts';
-import { loadRecentHistory } from '@/lib/historyDb';
 import { safeInvoke } from '@/lib/ipcLogger';
 
 import Toolbar from './components/Toolbar';
 import TabBar from './components/TabBar';
 import TabWorkspace from './components/TabWorkspace';
 import Sidebar from './components/Sidebar';
+import Onboarding from './components/Onboarding';
+import AuroraBackground from './components/AuroraBackground';
 import ErrorBoundary from '../ErrorBoundary';
 import Settings from '../Settings';
 import SLMPanel from '../SLMPanel';
@@ -23,7 +24,7 @@ import TabSearch from '../TabSearch';
 
 export default function BrowserShell() {
   const {
-    tabs, activeId, setTabs, setActiveId, setGlobalHistory,
+    tabs, activeId, setTabs, setActiveId, isIncognito, setIsIncognito,
     settings, updateSettings, slmOpen, setSlmOpen, toasts, addToast
   } = useBrowserStore();
 
@@ -82,19 +83,27 @@ export default function BrowserShell() {
     }
   };
 
-  const clearHistory = async () => { setGlobalHistory([]); };
+
 
   useKeyboardShortcuts(urlInputRef, nav, goBack, goFwd, reload, wvRefs);
 
   useEffect(() => {
     setMounted(true);
-    loadRecentHistory(500).then(h => setGlobalHistory(h));
+    const incognito = typeof window !== 'undefined' && window.location.search.includes('incognito=true');
+    if (incognito) {
+      setIsIncognito(true);
+    }
+    
     try {
       const savedSettings = localStorage.getItem('veil-settings');
       if (savedSettings) {
         // Deep-migrate any remaining browser:// links in settings to veil://
         const migratedSettingsStr = savedSettings.replace(/browser:\/\//g, 'veil://');
         const parsed = JSON.parse(migratedSettingsStr);
+        // Migrate: old default was darkMode:false, new default is true
+        if (parsed.darkMode === undefined || parsed.darkMode === false) {
+          parsed.darkMode = true;
+        }
         updateSettings(parsed);
       }
     } catch (e) {}
@@ -150,14 +159,15 @@ export default function BrowserShell() {
 
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem('veil-settings', JSON.stringify(settings));
+      if (!isIncognito) {
+        localStorage.setItem('veil-settings', JSON.stringify(settings));
+      }
       safeInvoke('sync_privacy_settings', { settings });
     }
-  }, [settings, mounted]);
+  }, [settings, mounted, isIncognito]);
 
   useEffect(() => {
-    // Data theme is always light per user preference (no dark mode needed)
-    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-theme', settings.darkMode ? 'dark' : 'light');
   }, [settings.darkMode]);
 
   useEffect(() => {
@@ -182,7 +192,7 @@ export default function BrowserShell() {
             const domain = new URL(tab.url).hostname;
             useBrowserStore.getState().updateTab(tab.id, {
               title: tab.title === 'Loading...' ? domain : tab.title,
-              favicon: `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
+              favicon: `https://icons.duckduckgo.com/ip3/${domain}.ico`
             });
           } catch (_e2) {}
         }
@@ -234,43 +244,50 @@ export default function BrowserShell() {
 
   return (
     <ErrorBoundary>
-      <div className="flex flex-col w-screen h-screen overflow-hidden bg-transparent text-[var(--text-primary)]">
+      <div className="flex flex-col w-screen h-screen overflow-hidden bg-transparent text-[var(--text-primary)]" data-incognito={isIncognito}>
+        <AuroraBackground isDark={settings.darkMode} isIncognito={isIncognito} />
         
         {/* Custom Titlebar (Drag Region & Window Controls) */}
         <div data-tauri-drag-region className="h-8 flex items-center justify-between px-3 flex-shrink-0 drag-region z-50">
-          <div className="w-[52px]" /> {/* Spacer for centering */}
           
-          <div className="text-[11px] font-medium text-[var(--text-tertiary)] pointer-events-none select-none tracking-widest uppercase">
-            Veil Browser
+          <div className="w-[150px]" /> {/* Spacer for centering */}
+
+          <div className="text-[11px] font-medium text-[var(--text-tertiary)] pointer-events-none select-none tracking-widest uppercase text-center flex-1 flex items-center justify-center gap-2">
+            Veil Browser {isIncognito && <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400">Incognito</span>}
           </div>
           
-          {/* Windows style Window Controls (Right side) */}
-          <div className="flex items-center gap-2 no-drag">
-            <button onClick={() => safeInvoke('minimize_window')} className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-sm shadow-yellow-400/50 flex items-center justify-center transition-colors group">
-              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-yellow-900 leading-none">−</span>
+          {/* Window Controls (Top Right) */}
+          <div className="flex items-center justify-end gap-2 no-drag w-[150px] pt-1">
+            <button onClick={() => safeInvoke('minimize_window')} className="w-3.5 h-3.5 rounded-full bg-yellow-400/80 hover:bg-yellow-400 shadow-sm shadow-yellow-400/30 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-yellow-900 text-[10px] leading-none font-bold">−</span>
             </button>
-            <button onClick={() => safeInvoke('maximize_window')} className="w-3 h-3 rounded-full bg-green-400 hover:bg-green-500 shadow-sm shadow-green-400/50 flex items-center justify-center transition-colors group">
-              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-green-900 leading-none">+</span>
+            <button onClick={() => safeInvoke('maximize_window')} className="w-3.5 h-3.5 rounded-full bg-green-400/80 hover:bg-green-400 shadow-sm shadow-green-400/30 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-green-900 text-[10px] leading-none font-bold">+</span>
             </button>
-            <button onClick={() => safeInvoke('close_window')} className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 shadow-sm shadow-red-400/50 flex items-center justify-center transition-colors group">
-              <span className="opacity-0 group-hover:opacity-100 text-[8px] text-red-900 leading-none">✕</span>
+            <button onClick={() => safeInvoke('close_window')} className="w-3.5 h-3.5 rounded-full bg-red-400/80 hover:bg-red-400 shadow-sm shadow-red-400/30 flex items-center justify-center transition-colors group">
+              <span className="opacity-0 group-hover:opacity-100 text-red-900 text-[8px] leading-none font-bold">✕</span>
             </button>
           </div>
         </div>
+        
+        {!settings.hasCompletedSetup && <Onboarding />}
 
-        <Toaster position="bottom-right" richColors />
-
-        {/* Main Interface Layout */}
+        <Toaster 
+          position="bottom-right" 
+          theme="dark" // We are using a dark Zen theme globally now
+          toastOptions={{
+            className: 'bg-[var(--bg-element)] border border-[var(--border-color)] text-[var(--text-primary)] font-medium shadow-2xl rounded-2xl p-4'
+          }} 
+        />
         <div className="flex-1 flex min-h-0 px-2 sm:px-3 pb-2 sm:pb-3 gap-2 sm:gap-3">
           
           {/* Sidebar (Hidden on very small screens) */}
-          <div className="hidden sm:block">
+          <div className="hidden sm:block h-full">
             <Sidebar />
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden p-1 sm:p-2">
-            <TabBar />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative glass-panel ml-1 mr-2 mb-2">
             <Toolbar
               urlInputRef={urlInputRef}
               urlInput={urlInput}
@@ -282,8 +299,8 @@ export default function BrowserShell() {
               setIsSettingsOpen={setIsSettingsOpen}
             />
 
-            <div className="flex-1 relative glass-panel overflow-hidden rounded-xl mt-2 border border-[var(--glass-border)]">
-              <TabWorkspace nav={nav} clearHistory={clearHistory} wvRefs={wvRefs} />
+            <div className="flex-1 relative overflow-hidden rounded-xl mx-2 mb-2">
+              <TabWorkspace nav={nav} wvRefs={wvRefs} />
               <ZoomIndicator />
               <SLMPanel isOpen={slmOpen} onClose={() => setSlmOpen(false)} currentContext={slmContext} />
             </div>
@@ -298,14 +315,14 @@ export default function BrowserShell() {
         <AnimatePresence>
           {isSettingsOpen && (
             <motion.div
-              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-white/30 backdrop-blur-sm"
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
               onClick={() => setIsSettingsOpen(false)}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
               <motion.div
-                className="glass-panel-heavy w-full max-w-2xl max-h-[85vh] overflow-y-auto p-4"
+                className="bg-[var(--bg-element)] border border-[var(--border-color)] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-4"
                 onClick={e => e.stopPropagation()}
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -321,7 +338,7 @@ export default function BrowserShell() {
         <AnimatePresence>
           {torError && (
             <motion.div
-              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-white/30 backdrop-blur-sm"
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

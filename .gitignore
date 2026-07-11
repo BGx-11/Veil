@@ -81,3 +81,13 @@ next-env.d.ts
 scratch.js
 test-*.js
 update-*.js
+
+# Agent/AI Repo copies
+.surfer_repo/
+.zen_desktop_repo/
+
+# Scratch & test outputs
+*.txt
+*.html
+parse.js
+

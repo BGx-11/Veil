@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { addHistoryToDb } from './historyDb';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface Tab {
   id: string;
@@ -21,6 +21,14 @@ export interface Tab {
   readerMode?: boolean;
   zoomLevel?: number; // percentage, default 100
   groupId?: string;
+  workspaceId?: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  icon: string;
+  color?: string;
 }
 
 export interface TabGroup {
@@ -98,6 +106,7 @@ export interface BrowserSettings {
   notes: Note[];
   passwords: PasswordEntry[];
   defaultZoom: number; // default zoom percentage for new tabs
+  hasCompletedSetup?: boolean;
 }
 
 export const NEWTAB = 'veil://newtab';
@@ -135,7 +144,6 @@ export function getInternalTitle(url: string): string {
 interface BrowserStore {
   tabs: Tab[];
   activeId: string;
-  globalHistory: HistoryEntry[];
   recentlyClosed: Tab[];
   sidebarOpen: boolean;
   sidebarWidth: number;
@@ -149,8 +157,13 @@ interface BrowserStore {
   toasts: Toast[];
   torLogs: string[];
   downloads: DownloadItem[];
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
+  activeWebPanelUrl: string | null;
+  isIncognito: boolean;
 
   // Actions
+  setIsIncognito: (val: boolean) => void;
   setTabs: (tabs: Tab[] | ((prev: Tab[]) => Tab[])) => void;
   setActiveId: (id: string) => void;
   addTab: (url?: string) => void;
@@ -164,10 +177,12 @@ interface BrowserStore {
   setSlmOpen: (open: boolean) => void;
   setTabSearchOpen: (open: boolean) => void;
   setFullscreen: (fs: boolean) => void;
+  setWorkspaces: (workspaces: Workspace[]) => void;
+  setActiveWorkspaceId: (id: string) => void;
+  setActiveWebPanelUrl: (url: string | null) => void;
   updateSettings: (updates: Partial<BrowserSettings>) => void;
   addToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
-  setGlobalHistory: (history: HistoryEntry[] | ((prev: HistoryEntry[]) => HistoryEntry[])) => void;
   addHistoryEntry: (entry: HistoryEntry) => void;
   addTorLog: (log: string) => void;
 
@@ -189,9 +204,8 @@ interface BrowserStore {
 }
 
 export const useBrowserStore = create<BrowserStore>((set, get) => ({
-  tabs: [{ id: '1', title: 'New Tab', url: NEWTAB, history: [NEWTAB], historyIndex: 0, loading: false, zoomLevel: 100 }],
+  tabs: [{ id: '1', title: 'New Tab', url: NEWTAB, history: [NEWTAB], historyIndex: 0, loading: false, zoomLevel: 100, workspaceId: 'default' }],
   activeId: '1',
-  globalHistory: [],
   recentlyClosed: [],
   sidebarOpen: true,
   sidebarWidth: 280,
@@ -218,6 +232,7 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
     blocklist: [],
     searchEngine: 'yahoo',
     defaultZoom: 100,
+    hasCompletedSetup: false,
     sidebarApps: [
       { id: '1', name: 'Veil AI', url: 'veil://slm', icon: 'Sparkles', color: 'orange-400' },
       { id: '2', name: 'Passwords', url: 'veil://passwords', icon: 'Key', color: 'indigo-500' },
@@ -234,6 +249,15 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
   toasts: [],
   torLogs: [],
   downloads: [],
+  workspaces: [
+    { id: 'default', name: 'Personal', icon: 'User', color: 'indigo-500' },
+    { id: 'work', name: 'Work', icon: 'Briefcase', color: 'orange-500' }
+  ],
+  activeWorkspaceId: 'default',
+  activeWebPanelUrl: null,
+  isIncognito: false,
+
+  setIsIncognito: (val) => set({ isIncognito: val }),
 
   setTabs: (tabsOrFn) => set((state) => ({ 
     tabs: typeof tabsOrFn === 'function' ? tabsOrFn(state.tabs) : tabsOrFn 
@@ -251,8 +275,9 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
     const targetUrl = typeof url === 'string' ? url : NEWTAB;
     const title = getInternalTitle(targetUrl);
     const defaultZoom = get().settings.defaultZoom || 100;
+    const currentWorkspaceId = get().activeWorkspaceId;
     set((state) => ({
-      tabs: [...state.tabs, { id, title, url: targetUrl, history: [targetUrl], historyIndex: 0, loading: false, zoomLevel: defaultZoom }],
+      tabs: [...state.tabs, { id, title, url: targetUrl, history: [targetUrl], historyIndex: 0, loading: false, zoomLevel: defaultZoom, workspaceId: currentWorkspaceId }],
       activeId: id
     }));
   },
@@ -267,7 +292,11 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
       
       const rest = state.tabs.filter((t) => t.id !== id);
       const newActiveId = state.activeId === id ? rest[rest.length - 1].id : state.activeId;
-      const newSplitTabId = state.splitTabId === id ? null : state.splitTabId;
+      let newSplitTabId = state.splitTabId === id ? null : state.splitTabId;
+      
+      if (newActiveId === newSplitTabId) {
+        newSplitTabId = null;
+      }
       
       return { tabs: rest, recentlyClosed, activeId: newActiveId, splitTabId: newSplitTabId };
     });
@@ -303,10 +332,20 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
   setSlmOpen: (open) => set({ slmOpen: open }),
   setTabSearchOpen: (open) => set({ tabSearchOpen: open }),
   setFullscreen: (fs) => set({ fullscreen: fs }),
+  setWorkspaces: (ws) => set({ workspaces: ws }),
+  setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id }),
+  setActiveWebPanelUrl: (url) => set({ activeWebPanelUrl: url }),
   
-  updateSettings: (updates) => set((state) => ({
-    settings: { ...state.settings, ...updates }
-  })),
+  updateSettings: (updates) => set((state) => {
+    let nextTabs = state.tabs;
+    if (updates.defaultZoom !== undefined) {
+      nextTabs = state.tabs.map(t => ({ ...t, zoomLevel: updates.defaultZoom as number }));
+    }
+    return {
+      settings: { ...state.settings, ...updates },
+      tabs: nextTabs
+    };
+  }),
 
   addToast: (message, type = 'info') => {
     const id = Math.random().toString(36).slice(2);
@@ -322,16 +361,10 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
     }));
   },
 
-  setGlobalHistory: (historyOrFn) => set((state) => ({
-    globalHistory: typeof historyOrFn === 'function' ? historyOrFn(state.globalHistory) : historyOrFn
-  })),
-
   addHistoryEntry: (entry) => {
-    set((state) => {
-      if (state.globalHistory[0]?.url === entry.url) return state;
-      addHistoryToDb(entry);
-      return { globalHistory: [entry, ...state.globalHistory] };
-    });
+    if (!get().isIncognito) {
+      invoke('add_history', { url: entry.url, title: entry.title, favicon: null }).catch(console.error);
+    }
   },
 
   addTorLog: (log) => {

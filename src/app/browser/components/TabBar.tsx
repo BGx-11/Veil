@@ -178,8 +178,8 @@ export default function TabBar() {
                             {...provided.dragHandleProps}
                             className={`group relative flex items-center gap-2 cursor-pointer text-[13px] font-medium transition-all duration-300 h-[36px] rounded-t-xl
                               ${isActive 
-                                ? `bg-white/70 backdrop-blur-2xl border border-white/60 border-b-0 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] text-[var(--text-primary)] min-w-[140px] ${splitTabId ? 'max-w-[360px]' : 'max-w-[260px]'} flex-shrink-0 z-10 font-semibold` 
-                                : 'glass-btn border-b-0 rounded-b-none text-[var(--text-secondary)] hover:bg-white/60 min-w-[38px] max-w-[220px] flex-1 shrink opacity-80 hover:opacity-100 z-0'
+                                ? `bg-[var(--bg-element)] border border-[var(--border-color)] border-b-0 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] text-[var(--text-primary)] min-w-[140px] ${splitTabId ? 'max-w-[360px]' : 'max-w-[260px]'} flex-shrink-0 z-10 font-semibold` 
+                                : 'glass-btn border-b-0 rounded-b-none text-[var(--text-secondary)] hover:bg-[var(--surface-icon-hover)] min-w-[38px] max-w-[220px] flex-1 shrink opacity-80 hover:opacity-100 z-0'
                               }
                               ${tab.pinned ? 'w-[42px] min-w-[42px] justify-center px-0 flex-none' : 'px-3'}
                             `}

@@ -1,4 +1,5 @@
 mod proxy;
+mod db;
 
 use proxy::start_proxy;
 use std::sync::Mutex;
@@ -65,21 +66,35 @@ fn toggle_tor(state: tauri::State<ProxyState>, app_handle: tauri::AppHandle, ena
             
             if !tor_exe.exists() {
                 let _ = app_clone.emit("tor-log", "Downloading Tor Expert Bundle...");
-                let url = "https://archive.torproject.org/tor-package-archive/torbrowser/13.5.3/tor-expert-bundle-windows-x86_64-13.5.3.tar.gz";
                 let archive_path = tor_dir.join("tor.tar.gz");
                 let _ = std::fs::create_dir_all(&tor_dir);
                 
-                let status = std::process::Command::new("curl")
-                    .args(["-s", "-L", url, "-o", archive_path.to_str().unwrap()])
-                    .status();
-                    
-                if let Ok(st) = status {
-                    if st.success() {
-                        let _ = app_clone.emit("tor-log", "Extracting Tor (this may take a moment)...");
-                        let _ = std::process::Command::new("tar")
-                            .args(["-xf", archive_path.to_str().unwrap(), "-C", tor_dir.to_str().unwrap()])
-                            .status();
+                let mut extract = false;
+                if let Ok(resource_path) = app_clone.path().resolve("tor.tar.gz", tauri::path::BaseDirectory::Resource) {
+                    if resource_path.exists() {
+                        let _ = app_clone.emit("tor-log", "Using bundled Tor Expert Bundle...");
+                        let _ = std::fs::copy(&resource_path, &archive_path);
+                        extract = true;
                     }
+                }
+                
+                if !extract {
+                    let _ = app_clone.emit("tor-log", "Downloading Tor Expert Bundle...");
+                    let url = "https://archive.torproject.org/tor-package-archive/torbrowser/13.5.3/tor-expert-bundle-windows-x86_64-13.5.3.tar.gz";
+                    let status = std::process::Command::new("curl")
+                        .args(["-s", "-L", url, "-o", archive_path.to_str().unwrap()])
+                        .status();
+                        
+                    if let Ok(st) = status {
+                        if st.success() { extract = true; }
+                    }
+                }
+                
+                if extract {
+                    let _ = app_clone.emit("tor-log", "Extracting Tor (this may take a moment)...");
+                    let _ = std::process::Command::new("tar")
+                        .args(["-xf", archive_path.to_str().unwrap(), "-C", tor_dir.to_str().unwrap()])
+                        .status();
                 }
             }
             
@@ -159,6 +174,22 @@ fn close_window(window: tauri::Window) {
 }
 
 #[tauri::command]
+async fn open_incognito_window(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{WebviewWindowBuilder, WebviewUrl};
+    
+    let label = format!("incognito-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    
+    let _ = WebviewWindowBuilder::new(&app_handle, label, WebviewUrl::App("/browser/?incognito=true".into()))
+        .title("Veil Browser - Incognito")
+        .inner_size(1200.0, 800.0)
+        .decorations(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+        
+    Ok(())
+}
+
+#[tauri::command]
 fn open_file(path: String) -> Result<(), String> {
     open::that(path).map_err(|e| e.to_string())
 }
@@ -196,6 +227,14 @@ pub fn run() {
         })
         .setup(move |app| {
             let app_handle = app.handle().clone();
+            
+            // Initialize SQLite DB
+            if let Ok(conn) = db::init_db(&app_handle) {
+                app.manage(Mutex::new(conn));
+            } else {
+                eprintln!("Failed to initialize history database.");
+            }
+            
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 rt.block_on(async {
@@ -212,9 +251,13 @@ pub fn run() {
             minimize_window,
             close_window,
             open_file,
+            open_incognito_window,
             pause_download,
             resume_download,
-            cancel_download
+            cancel_download,
+            db::add_history,
+            db::get_history,
+            db::clear_history
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

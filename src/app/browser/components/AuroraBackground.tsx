@@ -18,7 +18,7 @@ interface AuroraParticle {
   opacityDir: number;
 }
 
-export default function AuroraBackground({ isDark = true }: { isDark?: boolean }) {
+export default function AuroraBackground({ isDark = true, isIncognito = false }: { isDark?: boolean; isIncognito?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const particlesRef = useRef<AuroraParticle[]>([]);
@@ -68,7 +68,14 @@ export default function AuroraBackground({ isDark = true }: { isDark?: boolean }
     window.addEventListener('resize', resize);
 
     // Aurora blob definitions
-    const blobs = [
+    const blobs = isIncognito ? [
+      { cx: 0.25, cy: 0.15, rx: 0.4, ry: 0.3, speed: 0.0003, phase: 0,
+        darkColor: [100, 30, 255], lightColor: [100, 30, 255], opacity: 0.08 },
+      { cx: 0.72, cy: 0.25, rx: 0.3, ry: 0.25, speed: 0.00025, phase: 2,
+        darkColor: [160, 40, 255], lightColor: [160, 40, 255], opacity: 0.06 },
+      { cx: 0.5, cy: 0.82, rx: 0.35, ry: 0.22, speed: 0.00035, phase: 4,
+        darkColor: [180, 80, 255], lightColor: [180, 80, 255], opacity: 0.05 },
+    ] : [
       { cx: 0.25, cy: 0.15, rx: 0.4, ry: 0.3, speed: 0.0003, phase: 0,
         darkColor: [77, 141, 255], lightColor: [58, 123, 245], opacity: 0.06 },
       { cx: 0.72, cy: 0.25, rx: 0.3, ry: 0.25, speed: 0.00025, phase: 2,
@@ -108,7 +115,7 @@ export default function AuroraBackground({ isDark = true }: { isDark?: boolean }
         const ry = blob.ry * h;
 
         const color = isDark ? blob.darkColor : blob.lightColor;
-        const opMult = isDark ? 1 : 0.5;
+        const opMult = isDark ? 1 : 1.2;
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
         grad.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${blob.opacity * opMult})`);
         grad.addColorStop(0.5, `rgba(${color[0]},${color[1]},${color[2]},${blob.opacity * opMult * 0.4})`);
@@ -133,10 +140,10 @@ export default function AuroraBackground({ isDark = true }: { isDark?: boolean }
         if (p.y < 0) p.y = h;
         if (p.y > h) p.y = 0;
 
-        const particleColor = isDark ? '180, 200, 255' : '80, 100, 160';
+        const particleColor = isIncognito ? '190, 140, 255' : (isDark ? '180, 200, 255' : '80, 100, 160');
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${particleColor},${p.opacity * (isDark ? 1 : 0.6)})`;
+        ctx.fillStyle = `rgba(${particleColor},${p.opacity * (isDark ? 1 : 1.2)})`;
         ctx.fill();
       }
 
@@ -149,13 +156,13 @@ export default function AuroraBackground({ isDark = true }: { isDark?: boolean }
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [isDark, initParticles]);
+  }, [isDark, isIncognito, initParticles]);
 
   return (
     <canvas
       ref={canvasRef}
       className="fixed inset-0 z-0 pointer-events-none"
-      style={{ opacity: isDark ? 0.9 : 0.7 }}
+      style={{ opacity: isDark ? 0.9 : 1 }}
       aria-hidden="true"
     />
   );

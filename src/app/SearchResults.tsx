@@ -24,6 +24,8 @@ interface KnowledgePanelData {
   content_urls: { desktop: { page: string } };
 }
 
+const searchCache = new Map<string, any>();
+
 const TABS = [
   { id: 'All', icon: Search },
   { id: 'Images', icon: ImageIcon },
@@ -317,22 +319,25 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
   const [visibleCount, setVisibleCount] = useState(30);
   const [usedEngine, setUsedEngine] = useState<string | null>(null);
   const [usedFallback, setUsedFallback] = useState(false);
+  const [captchaEngine, setCaptchaEngine] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Cache results so tab switching doesn't re-fetch
   const cachedResults = useRef<SearchResult[]>([]);
 
-  const buildSearchUrl = useCallback((engine: string, q: string) => {
+  const buildSearchUrl = useCallback((engine: string, q: string, pageNum: number = 0) => {
     switch (engine) {
       case 'yahoo':
-        return `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`;
+        return `https://search.yahoo.com/search?p=${encodeURIComponent(q)}${pageNum > 0 ? `&b=${pageNum * 10 + 1}` : ''}`;
       case 'duckduckgo':
-        return `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
+        return `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`; // DDG HTML pagination is complex
       case 'google':
-        return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+        return `https://www.google.com/search?q=${encodeURIComponent(q)}${pageNum > 0 ? `&start=${pageNum * 10}` : ''}`;
       case 'brave':
-        return `https://search.brave.com/search?q=${encodeURIComponent(q)}`;
+        return `https://search.brave.com/search?q=${encodeURIComponent(q)}${pageNum > 0 ? `&offset=${pageNum}` : ''}`;
       default: // bing
-        return `https://www.bing.com/search?q=${encodeURIComponent(q)}`;
+        return `https://www.bing.com/search?q=${encodeURIComponent(q)}${pageNum > 0 ? `&first=${pageNum * 10 + 1}` : ''}`;
     }
   }, []);
 
@@ -346,8 +351,8 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
     }
   }, []);
 
-  const fetchAndParse = useCallback(async (engine: string, q: string): Promise<{ results: SearchResult[]; isCaptcha: boolean }> => {
-    const targetUrl = buildSearchUrl(engine, q);
+  const fetchAndParse = useCallback(async (engine: string, q: string, pageNum: number = 0): Promise<{ results: SearchResult[]; isCaptcha: boolean }> => {
+    const targetUrl = buildSearchUrl(engine, q, pageNum);
     const searchUrl = `http://127.0.0.1:8181/proxy?url=${encodeURIComponent(targetUrl)}`;
 
     const response = await fetch(searchUrl);
@@ -373,19 +378,39 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
   useEffect(() => {
     let alive = true;
     let progressCb: any = null;
+    
+    const engine = useBrowserStore.getState().settings.searchEngine;
+    const cleanQuery = decodeURIComponent(query);
+    const cacheKey = `${engine}:${cleanQuery}`;
+
+    // Skip fetch if we have a valid cache entry
+    if (searchCache.has(cacheKey) && !window.location.hash.includes('retry')) {
+      const cached = searchCache.get(cacheKey);
+      if (cached && cached.results) {
+        setResults(cached.results);
+        setUsedEngine(cached.usedEngine);
+        setUsedFallback(cached.usedFallback);
+        setKnowledgePanel(cached.knowledgePanel || null);
+        setSlmSummary(cached.slmSummary || null);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     setErrorDetail(null);
     setSlmSummary(null);
     setResults([]);
     setVisibleCount(30);
+    setPage(0);
     setUsedFallback(false);
+    setCaptchaEngine(null);
     cachedResults.current = [];
 
     (async () => {
       try {
-        const engine = useBrowserStore.getState().settings.searchEngine;
-        const cleanQuery = decodeURIComponent(query);
 
         let parsed: SearchResult[] = [];
         let finalEngine = engine;
@@ -396,6 +421,7 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
           const result = await fetchAndParse(engine, cleanQuery);
           parsed = result.results;
           wasCaptcha = result.isCaptcha;
+          if (wasCaptcha && alive) setCaptchaEngine(engine);
         } catch (err: any) {
           console.warn(`Primary engine ${engine} failed:`, err.message);
         }
@@ -408,7 +434,10 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
             if (fallbackResult.results.length > 0) {
               parsed = fallbackResult.results;
               finalEngine = 'yahoo';
-              if (alive) setUsedFallback(true);
+              if (alive) {
+                setUsedFallback(true);
+                useBrowserStore.getState().updateSettings({ searchEngine: 'yahoo' });
+              }
             }
           } catch (err: any) {
             console.warn('Yahoo fallback also failed:', err.message);
@@ -422,7 +451,10 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
             if (fallbackResult.results.length > 0) {
               parsed = fallbackResult.results;
               finalEngine = 'bing';
-              if (alive) setUsedFallback(true);
+              if (alive) {
+                setUsedFallback(true);
+                useBrowserStore.getState().updateSettings({ searchEngine: 'bing' });
+              }
             }
           } catch { /* all fallbacks exhausted */ }
         }
@@ -442,6 +474,10 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
 
           setResults(deduped);
           cachedResults.current = deduped;
+
+          // Initialize cache entry
+          const currentCache = { results: deduped, usedEngine: finalEngine, usedFallback: engine !== finalEngine };
+          searchCache.set(cacheKey, currentCache);
 
           // ── SLM AI Summary ──
           if (useBrowserStore.getState().settings.slmConsent) {
@@ -465,11 +501,15 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
                 { role: 'system', content: 'You are Veil AI, a highly intelligent browser assistant. Your task is to read the provided search results and synthesize a precise, exceptionally well-reasoned, and accurate summary paragraph that directly answers the user\'s query. Ensure it is factually correct and concise.' },
                 { role: 'user', content: `Query: ${cleanQuery}\n\nResults:\n${contextText}` }
               ];
-              const output = await generator(messagesArray, { max_new_tokens: 100 });
+              const output = await generator(messagesArray, { max_new_tokens: 100, temperature: 0.1, repetition_penalty: 1.18, do_sample: true, top_p: 0.9 });
               let text = output[0].generated_text;
               if (Array.isArray(text)) text = text[text.length - 1].content;
               else if (typeof text === 'string' && text.includes('<|assistant|>\n')) text = text.split('<|assistant|>\n').pop()?.trim() || text;
-              if (alive) setSlmSummary(text);
+              if (alive) {
+                setSlmSummary(text);
+                const cc = searchCache.get(cacheKey);
+                if (cc) cc.slmSummary = text;
+              }
             } catch (e: any) {
               if (alive) { setSlmProgress(`AI Error: ${e.message}`); setSlmGenerating(false); }
             } finally {
@@ -502,8 +542,13 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
               data = await wikiRes.json();
             }
           }
-          if (data.type !== 'disambiguation' && data.title !== 'Not found.' && data.extract && alive) setKnowledgePanel(data);
-          else if (alive) setKnowledgePanel(null);
+          if (data.type !== 'disambiguation' && data.title !== 'Not found.' && data.extract && alive) {
+            setKnowledgePanel(data);
+            const cc = searchCache.get(cacheKey);
+            if (cc) cc.knowledgePanel = data;
+          } else if (alive) {
+            setKnowledgePanel(null);
+          }
         } catch {
           if (alive) setKnowledgePanel(null);
         }
@@ -524,15 +569,53 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
   const getDomain = (url: string) => { try { return new URL(url).hostname; } catch { return url; } };
 
   const handleRetry = () => {
-    // Force re-fetch by toggling a key. We just re-set the query which triggers the effect.
+    const engine = useBrowserStore.getState().settings.searchEngine;
+    const cleanQuery = decodeURIComponent(query);
+    const cacheKey = `${engine}:${cleanQuery}`;
+    searchCache.delete(cacheKey);
+
     setResults([]);
     setError(null);
     setErrorDetail(null);
     setLoading(true);
-    // The effect depends on [query], so we need to trigger it differently.
-    // We'll use a direct approach: re-run the fetch manually.
+    setPage(0);
     window.location.hash = '#retry-' + Date.now();
     window.location.hash = '';
+  };
+
+  const handleLoadMore = async () => {
+    if (!usedEngine) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const cleanQuery = decodeURIComponent(query);
+      const res = await fetchAndParse(usedEngine, cleanQuery, nextPage);
+      
+      if (res.results.length > 0) {
+        setResults(prev => {
+          const newResults = [...prev, ...res.results];
+          const seen = new Set<string>();
+          const deduped = newResults.filter(r => {
+            const key = r.url.replace(/\/$/, '').toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          cachedResults.current = deduped;
+          // update cache
+          const cacheKey = `${usedEngine}:${cleanQuery}`;
+          const cc = searchCache.get(cacheKey);
+          if (cc) cc.results = deduped;
+          return deduped;
+        });
+        setPage(nextPage);
+        setVisibleCount(v => v + 30);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   return (
@@ -560,7 +643,26 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
               const isActive = activeTab === tab.id;
               return (
                 <button
-                  key={tab.id} onClick={() => { setActiveTab(tab.id); setVisibleCount(30); }}
+                  key={tab.id} 
+                  onClick={() => { 
+                    if (tab.id === 'All') {
+                      setActiveTab(tab.id); setVisibleCount(30); 
+                    } else {
+                      // Navigate to native search engines
+                      const q = encodeURIComponent(decodeURIComponent(query));
+                      const engine = useBrowserStore.getState().settings.searchEngine;
+                      const buildTabUrl = (eng: string, tid: string, q: string) => {
+                        // Google, Yahoo, and DuckDuckGo often block proxy requests for their sub-services.
+                        // We route sub-tabs to Bing to ensure they render natively and seamlessly inside Veil.
+                        if (tid === 'Images') return `https://www.bing.com/images/search?q=${q}`;
+                        if (tid === 'Videos') return `https://www.bing.com/videos/search?q=${q}`;
+                        if (tid === 'News') return `https://www.bing.com/news/search?q=${q}`;
+                        if (tid === 'Shopping') return `https://www.bing.com/shop?q=${q}`;
+                        return `https://www.bing.com/search?q=${q}`;
+                      };
+                      onNavigate(buildTabUrl(engine, tab.id, q));
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors relative"
                   style={{ color: isActive ? 'var(--accent)' : 'var(--text-tertiary)' }}
                 >
@@ -572,6 +674,23 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
               );
             })}
           </div>
+          {captchaEngine && (
+            <div className="flex items-center justify-between p-4 rounded-xl mt-2" style={{ background: 'var(--warning-surface, rgba(245, 158, 11, 0.1))', border: '1px solid var(--warning, #f59e0b)' }}>
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={20} style={{ color: 'var(--warning, #f59e0b)' }} />
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  <strong>{captchaEngine}</strong> requested a CAPTCHA. We've temporarily switched your search to {useBrowserStore.getState().settings.searchEngine}.
+                </span>
+              </div>
+              <button 
+                onClick={() => onNavigate(buildSearchUrl(captchaEngine, decodeURIComponent(query)))}
+                className="px-4 py-2 rounded-lg text-sm font-bold shadow-md transition-transform active:scale-95 whitespace-nowrap"
+                style={{ background: 'var(--warning, #f59e0b)', color: 'white' }}
+              >
+                Solve CAPTCHA
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-8 items-start">
@@ -619,18 +738,17 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
             )}
 
             {!loading && !error && results.length > 0 && (() => {
-              // Simple URL-based heuristic filtering
-              const filteredResults = results.filter(r => {
-                if (activeTab === 'All') return true;
-                const url = r.url.toLowerCase();
-                if (activeTab === 'Images') return /\.(jpg|jpeg|png|gif|webp|svg)$/.test(url);
-                if (activeTab === 'Videos') return /youtube\.com|vimeo\.com|dailymotion\.com|tiktok\.com|twitch\.tv|\.(mp4|webm|mkv)$/.test(url);
-                if (activeTab === 'News') return /news|nytimes|cnn|bbc|theguardian|reuters|apnews|bloomberg|wsj/.test(url);
-                if (activeTab === 'Shopping') return /amazon|ebay|walmart|target|etsy|aliexpress|bestbuy/.test(url);
-                return true;
-              });
+              // We only render "All" (Web) results natively in Veil Browser.
+              // Other tabs redirect to the search engine's native experience.
+              if (activeTab !== 'All') {
+                return (
+                  <div className="p-6 rounded-xl text-center font-medium" style={{ background: 'var(--glass-bg)', color: 'var(--text-tertiary)' }}>
+                    Redirecting to native {activeTab.toLowerCase()} search...
+                  </div>
+                );
+              }
 
-              if (filteredResults.length === 0) {
+              if (results.length === 0) {
                 return (
                   <div className="p-6 rounded-xl text-center font-medium" style={{ background: 'var(--glass-bg)', color: 'var(--text-tertiary)' }}>
                     No {activeTab.toLowerCase()} results found.
@@ -639,8 +757,8 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
               }
 
               return (
-                <div className={`grid ${['Images', 'Videos', 'Shopping'].includes(activeTab) ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4' : 'flex flex-col gap-4'}`}>
-                  {filteredResults.slice(0, visibleCount).map((r, i) => {
+                <div className="flex flex-col gap-4">
+                  {results.slice(0, visibleCount).map((r, i) => {
                     const domain = getDomain(r.url);
                     return (
                       <div
@@ -663,7 +781,7 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
                         onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-bg)'; e.currentTarget.style.borderColor = 'var(--glass-border)'; }}
                       >
                       <div className="flex items-center gap-2 mb-2">
-                        <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} className="w-4 h-4 rounded-sm" alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img src={`https://icons.duckduckgo.com/ip3/${domain}.ico`} className="w-4 h-4 rounded-sm" alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         <span className="text-xs font-medium truncate" style={{ color: 'var(--text-tertiary)' }}>{domain}</span>
                       </div>
                       <h3 className="text-base font-semibold mb-1.5 group-hover:underline decoration-2 underline-offset-2" style={{ color: 'var(--accent)', textDecorationColor: 'var(--accent-glow)' }}>
@@ -679,16 +797,21 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
               );
             })()}
 
-            {!loading && !error && visibleCount < results.length && (
+            {!loading && !error && activeTab === 'All' && results.length > 0 && (
               <div className="flex justify-center mt-4 pb-8">
                 <button
-                  onClick={() => setVisibleCount(v => v + 30)}
-                  className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 disabled:opacity-50 flex items-center gap-2"
                   style={{ background: 'var(--glass-bg-active)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--glass-bg-hover)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--glass-bg-active)'; }}
+                  onMouseEnter={e => { if (!loadingMore) e.currentTarget.style.background = 'var(--glass-bg-hover)'; }}
+                  onMouseLeave={e => { if (!loadingMore) e.currentTarget.style.background = 'var(--glass-bg-active)'; }}
                 >
-                  Load More Results
+                  {loadingMore ? (
+                    <><Loader2 size={16} className="animate-spin" /> Loading...</>
+                  ) : (
+                    'Load More Results'
+                  )}
                 </button>
               </div>
             )}

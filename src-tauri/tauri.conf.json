@@ -37,6 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": ["tor.tar.gz"],
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

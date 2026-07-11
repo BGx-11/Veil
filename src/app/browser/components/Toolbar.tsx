@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { PanelLeft, ArrowLeft, ArrowRight, RotateCw, Home, Lock, Unlock, Star, BookOpen, Columns2, Bot, Download, Search, Mic, ZoomIn, ZoomOut, Camera, Layers, Shield } from 'lucide-react';
+import { PanelLeft, ArrowLeft, ArrowRight, RotateCw, Home, Lock, Unlock, Star, BookOpen, Columns2, Bot, Download, Search, Mic, ZoomIn, ZoomOut, Camera, Layers, Shield, Clock, Languages, Ghost } from 'lucide-react';
 import { useBrowserStore, isInternal, unwrapProxyUrl, NEWTAB } from '@/lib/store';
 import { parseNavigationInput } from '@/lib/urlParser';
+import { invoke } from '@tauri-apps/api/core';
 
 function ToolbarButton({ onClick, disabled, title, active, danger, children }: {
   onClick?: () => void; disabled?: boolean; title?: string; active?: boolean; danger?: boolean; children: React.ReactNode;
@@ -12,7 +13,7 @@ function ToolbarButton({ onClick, disabled, title, active, danger, children }: {
       disabled={disabled}
       title={title}
       className={`h-9 w-9 flex items-center justify-center rounded-full transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed
-        ${active ? 'bg-[var(--accent-primary)] text-white shadow-md' : 'glass-btn text-[var(--text-secondary)]'}
+        ${active ? 'bg-[var(--accent-primary)] text-white shadow-md' : 'bg-transparent hover:bg-[var(--surface-icon-hover)] text-[var(--text-secondary)]'}
         ${danger && !disabled ? 'text-red-500' : ''}`}
     >
       {children}
@@ -131,10 +132,43 @@ export default function Toolbar({
     clearSuggestions();
   };
 
+  // Compute all unified search items for dropdown and keyboard navigation
+  const allItems = React.useMemo(() => {
+    const lowerInput = urlInput.trim().toLowerCase();
+    if (!isFocused || lowerInput.length === 0) return [];
+    
+    const matchingTabs = tabs.filter(t => 
+      t.id !== activeId && 
+      !isInternal(t.url) &&
+      ((t.title || '').toLowerCase().includes(lowerInput) || t.url.toLowerCase().includes(lowerInput))
+    ).slice(0, 3);
+
+    const matchingBookmarks = settings.bookmarks.filter((b: any) => 
+      (b.title || '').toLowerCase().includes(lowerInput) || b.url.toLowerCase().includes(lowerInput)
+    ).slice(0, 3);
+
+
+
+    const items: Array<{ type: string, title: string, url: string, raw?: string }> = [];
+    matchingTabs.forEach(t => items.push({ type: 'tab', title: t.title || 'Tab', url: t.url }));
+    matchingBookmarks.forEach(b => items.push({ type: 'bookmark', title: b.title || 'Bookmark', url: b.url }));
+
+    suggestions.forEach(s => items.push({ type: 'suggestion', title: s, url: s, raw: s }));
+    
+    return items;
+  }, [isFocused, urlInput, suggestions, tabs, activeId, settings.bookmarks]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < suggestions.length) {
-      navigateToInput(suggestions[selectedSuggestionIndex]);
+    if (selectedSuggestionIndex >= 0 && selectedSuggestionIndex < allItems.length) {
+      const item = allItems[selectedSuggestionIndex];
+      if (item.type === 'tab') {
+        const targetTab = tabs.find(t => t.url === item.url);
+        if (targetTab) useBrowserStore.getState().setActiveId(targetTab.id);
+        urlInputRef.current?.blur();
+      } else {
+        navigateToInput(item.raw || item.url);
+      }
     } else {
       navigateToInput(urlInput);
     }
@@ -147,17 +181,17 @@ export default function Toolbar({
       return;
     }
 
-    if (suggestions.length === 0) return;
+    if (allItems.length === 0) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedSuggestionIndex(prev =>
-        prev < suggestions.length - 1 ? prev + 1 : 0
+        prev < allItems.length - 1 ? prev + 1 : 0
       );
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedSuggestionIndex(prev =>
-        prev > 0 ? prev - 1 : suggestions.length - 1
+        prev > 0 ? prev - 1 : allItems.length - 1
       );
     } else if (e.key === 'Escape') {
       clearSuggestions();
@@ -235,7 +269,8 @@ export default function Toolbar({
       {/* Center Search Bar */}
       <div className="flex-1 relative min-w-[150px] mx-1 sm:mx-2">
         <form
-          className="flex items-center h-11 px-2 sm:px-3 gap-2 sm:gap-3 rounded-full glass-input"
+          className={`flex items-center h-[38px] px-2 sm:px-3 gap-2 sm:gap-3 rounded-full transition-all duration-300 border ${isFocused ? 'bg-[var(--bg-element)]' : 'glass-input'}`}
+          style={{ borderColor: isFocused ? 'var(--accent-primary)' : 'transparent', boxShadow: isFocused ? '0 0 0 2px var(--accent-glow)' : 'none' }}
           onSubmit={handleSubmit}
           onFocus={() => setIsFocused(true)}
           onBlur={handleBlur}
@@ -243,17 +278,36 @@ export default function Toolbar({
           <button
             type="button"
             onClick={() => {
+              if (settings.torMode) {
+                // If in Tor Mode, clicking it could toggle normalMode or we can just leave it as an indicator
+                addToast('Cannot toggle privacy modes while Tor is active', 'warning');
+                return;
+              }
               const newVal = !settings.normalMode;
               updateSettings({ normalMode: newVal });
-              addToast(newVal ? 'Normal Mode Enabled' : 'Privacy Mode Active', 'info');
+              addToast(newVal ? 'Standard Mode Enabled' : 'Privacy Mode Active');
             }}
-            className={`flex items-center justify-center transition-colors rounded-full w-8 h-8 flex-shrink-0 glass-btn hidden sm:flex
-              ${settings.torMode ? 'text-green-500' : 
-                settings.normalMode ? 'text-[var(--text-tertiary)]' : 
-                'text-[var(--accent-primary)]'}`}
-            title={settings.normalMode ? "Standard Browsing" : "Privacy Mode"}
+            className={`flex items-center justify-center gap-1.5 transition-all rounded-full h-7 px-2.5 flex-shrink-0 border hidden sm:flex
+              ${settings.torMode 
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/20' : 
+                !settings.normalMode 
+                ? 'bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-500 hover:bg-fuchsia-500/20' : 
+                'bg-transparent border-transparent text-[var(--text-tertiary)] hover:bg-[var(--surface-icon-hover)]'}`}
+            title={settings.torMode ? "Tor Network Active" : (!settings.normalMode ? "Privacy Mode" : "Standard Browsing")}
           >
-            {settings.normalMode ? <Unlock size={14} /> : <Lock size={14} />}
+            {settings.torMode ? (
+              <>
+                <Shield size={12} className="shrink-0" />
+                <span className="text-[11px] font-bold tracking-wide uppercase">Tor</span>
+              </>
+            ) : !settings.normalMode ? (
+              <>
+                <Lock size={12} className="shrink-0" />
+                <span className="text-[11px] font-bold tracking-wide uppercase">Private</span>
+              </>
+            ) : (
+              <Unlock size={12} className="shrink-0" />
+            )}
           </button>
 
           <input
@@ -272,6 +326,19 @@ export default function Toolbar({
             <ToolbarButton onClick={toggleReaderMode} disabled={!active || isInternal(active?.url || '')} title="Reader Mode" active={active?.readerMode}>
               <BookOpen size={14} />
             </ToolbarButton>
+            <ToolbarButton 
+              onClick={() => {
+                if (active && !isInternal(active.url)) {
+                  useBrowserStore.getState().updateTab(active.id, { 
+                    url: `https://translate.google.com/translate?sl=auto&tl=en&u=${encodeURIComponent(active.url)}` 
+                  });
+                }
+              }} 
+              disabled={!active || isInternal(active?.url || '')} 
+              title="Translate Page"
+            >
+              <Languages size={14} />
+            </ToolbarButton>
             <ToolbarButton onClick={toggleBookmark} title="Bookmark" active={isBookmarked}>
               <Star size={14} className={isBookmarked ? 'fill-current' : ''} />
             </ToolbarButton>
@@ -279,46 +346,94 @@ export default function Toolbar({
         </form>
 
         {/* Search Suggestions Dropdown */}
-        {isFocused && suggestions.length > 0 && (
-          <div
-            ref={suggestionsRef}
-            className="absolute left-0 right-0 top-[calc(100%+4px)] rounded-xl overflow-hidden z-50 shadow-lg"
-            style={{
-              background: 'var(--glass-bg, rgba(255,255,255,0.95))',
-              border: '1px solid var(--glass-border)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-            }}
-          >
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={suggestion}
-                type="button"
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors duration-100"
-                style={{
-                  color: 'var(--text-primary)',
-                  background: index === selectedSuggestionIndex ? 'var(--glass-bg-hover, rgba(0,0,0,0.05))' : 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  setSelectedSuggestionIndex(index);
-                  e.currentTarget.style.background = 'var(--glass-bg-hover, rgba(0,0,0,0.05))';
-                }}
-                onMouseLeave={(e) => {
-                  if (index !== selectedSuggestionIndex) {
-                    e.currentTarget.style.background = 'transparent';
-                  }
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault(); // Prevent blur
-                  navigateToInput(suggestion);
-                }}
-              >
-                <Search size={14} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                <span className="text-sm font-medium truncate">{suggestion}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {isFocused && urlInput.trim().length > 0 && (() => {
+          const lowerInput = urlInput.toLowerCase();
+          
+          const matchingTabs = tabs.filter(t => 
+            t.id !== activeId && 
+            !isInternal(t.url) &&
+            ((t.title || '').toLowerCase().includes(lowerInput) || t.url.toLowerCase().includes(lowerInput))
+          ).slice(0, 3);
+
+          const matchingBookmarks = settings.bookmarks.filter((b: any) => 
+            (b.title || '').toLowerCase().includes(lowerInput) || b.url.toLowerCase().includes(lowerInput)
+          ).slice(0, 3);
+
+          // Combine all items into a single flat array for keyboard navigation
+          const allItems: Array<{ type: string, title: string, url: string, raw?: string }> = [];
+          
+          matchingTabs.forEach(t => allItems.push({ type: 'tab', title: t.title || 'Tab', url: t.url }));
+          matchingBookmarks.forEach(b => allItems.push({ type: 'bookmark', title: b.title || 'Bookmark', url: b.url }));
+
+          suggestions.forEach(s => allItems.push({ type: 'suggestion', title: s, url: s, raw: s }));
+
+          if (allItems.length === 0) return null;
+
+          return (
+            <div
+              ref={suggestionsRef}
+              className="absolute left-0 right-0 top-[calc(100%+8px)] rounded-2xl overflow-hidden z-[100] shadow-2xl flex flex-col max-h-[70vh] overflow-y-auto custom-scrollbar"
+              style={{
+                background: 'var(--glass-bg, rgba(255,255,255,0.95))',
+                border: '1px solid var(--glass-border)',
+                backdropFilter: 'blur(30px)',
+                WebkitBackdropFilter: 'blur(30px)',
+              }}
+            >
+              {allItems.map((item, index) => {
+                const isSelected = index === selectedSuggestionIndex;
+                let Icon = Search;
+                if (item.type === 'tab') Icon = Layers;
+                if (item.type === 'bookmark') Icon = Star;
+                if (item.type === 'history') Icon = Clock;
+                
+                return (
+                  <button
+                    key={`${item.type}-${index}`}
+                    type="button"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-100"
+                    style={{
+                      color: 'var(--text-primary)',
+                      background: isSelected ? 'var(--glass-bg-hover, rgba(0,0,0,0.05))' : 'transparent',
+                    }}
+                    onMouseEnter={(e) => {
+                      setSelectedSuggestionIndex(index);
+                      e.currentTarget.style.background = 'var(--glass-bg-hover, rgba(0,0,0,0.05))';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (index !== selectedSuggestionIndex) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      if (item.type === 'tab') {
+                        const targetTab = tabs.find(t => t.url === item.url);
+                        if (targetTab) useBrowserStore.getState().setActiveId(targetTab.id);
+                        urlInputRef.current?.blur();
+                      } else {
+                        navigateToInput(item.raw || item.url);
+                      }
+                    }}
+                  >
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--glass-bg-active)' }}>
+                      <Icon size={14} style={{ color: 'var(--text-tertiary)' }} />
+                    </div>
+                    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                      <span className="text-sm font-semibold truncate text-[var(--text-primary)]">{item.title}</span>
+                      {item.type !== 'suggestion' && (
+                        <span className="text-xs truncate opacity-60 text-[var(--text-secondary)]">{item.url}</span>
+                      )}
+                    </div>
+                    {item.type === 'tab' && (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--accent-primary)', color: 'white', opacity: 0.9 }}>Switch to Tab</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Right Controls */}
@@ -366,11 +481,21 @@ export default function Toolbar({
           </div>
         )}
 
+        {/* Incognito */}
+        <ToolbarButton
+          onClick={() => {
+            invoke('open_incognito_window').catch(console.error);
+          }}
+          title="New Incognito Window"
+        >
+          <Ghost size={14} />
+        </ToolbarButton>
+
         {/* Screenshot */}
         <ToolbarButton
           onClick={() => {
             import('@/app/ScreenshotTool').then(mod => {
-              mod.captureScreenshot(addToast, { current: {} } as any);
+              mod.captureScreenshot(addToast);
             });
           }}
           title="Screenshot (Ctrl+Shift+S)"

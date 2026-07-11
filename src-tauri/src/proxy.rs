@@ -7,7 +7,7 @@ use axum::{
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
 use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use url::Url;
@@ -15,6 +15,8 @@ use tauri::{AppHandle, Emitter};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use futures_util::StreamExt;
+use adblock::engine::Engine;
+use adblock::lists::ParseOptions;
 
 use crate::PrivacySettings;
 
@@ -23,6 +25,8 @@ pub struct ProxyQuery {
     url: String,
     #[serde(default)]
     raw: Option<bool>,
+    #[serde(default)]
+    incognito: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -43,9 +47,14 @@ pub struct ProxyContext {
     pub tor_state: Arc<Mutex<bool>>,
     pub privacy: Arc<Mutex<PrivacySettings>>,
     pub blocked_count: Arc<Mutex<u64>>,
-    pub blocklist: Arc<HashSet<String>>,
+    pub blocklist: Arc<Engine>,
     pub app_handle: AppHandle,
-    pub referer_map: Arc<Mutex<std::collections::HashMap<String, String>>>,
+    pub referer_map: Arc<Mutex<std::collections::HashMap<String, (String, bool)>>>,
+    pub incognito_jar: std::sync::Arc<reqwest::cookie::Jar>,
+    pub client_normal: Client,
+    pub client_incognito: Client,
+    pub client_tor: Client,
+    pub client_tor_incognito: Client,
 }
 
 #[derive(Serialize, Clone)]
@@ -139,37 +148,30 @@ fn handle_download(res: reqwest::Response, app_handle: AppHandle, target_url: St
 }
 
 /// Build the ad/tracker blocklist from embedded domains
-fn build_blocklist() -> HashSet<String> {
+fn build_blocklist() -> Engine {
     // Curated list of ~2500 most common ad/tracker domains
     // Sources: Peter Lowe's list, StevenBlack/hosts (condensed)
     let domains = include_str!("blocklist.txt");
-    domains
+    let rules: Vec<String> = domains
         .lines()
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| l.trim().to_lowercase())
-        .collect()
+        .filter(|l| !l.is_empty() && !l.starts_with('#') && *l != "0.0.0.0")
+        .map(|l| format!("||{}^", l.trim().to_lowercase()))
+        .collect();
+    
+    let engine = Engine::from_rules(&rules, ParseOptions::default());
+    engine
 }
 
+use adblock::request::Request;
+
 /// Check if a URL's domain matches any blocked domain
-fn is_blocked(url_str: &str, blocklist: &HashSet<String>) -> bool {
-    if let Ok(parsed) = Url::parse(url_str) {
-        if let Some(host) = parsed.host_str() {
-            let host = host.to_lowercase();
-            // Check exact match
-            if blocklist.contains(&host) {
-                return true;
-            }
-            // Check parent domains (e.g., sub.tracker.com → tracker.com)
-            let parts: Vec<&str> = host.split('.').collect();
-            for i in 1..parts.len().saturating_sub(1) {
-                let parent = parts[i..].join(".");
-                if blocklist.contains(&parent) {
-                    return true;
-                }
-            }
-        }
+fn is_blocked(url_str: &str, blocklist: &Engine) -> bool {
+    if let Ok(req) = Request::new(url_str, "", "") {
+        let check = blocklist.check_network_request(&req);
+        check.matched
+    } else {
+        false
     }
-    false
 }
 
 /// JavaScript to inject for WebRTC leak protection
@@ -235,12 +237,19 @@ pub async fn start_proxy(
 ) {
     let blocklist = Arc::new(build_blocklist());
     let referer_map = Arc::new(Mutex::new(std::collections::HashMap::new()));
-    let ctx = ProxyContext { tor_state, privacy, blocked_count, blocklist, app_handle, referer_map };
+    let incognito_jar = std::sync::Arc::new(reqwest::cookie::Jar::default());
+    
+    let client_normal = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).build().unwrap();
+    let client_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).build().unwrap();
+    let client_tor = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).build().unwrap_or_else(|_| client_normal.clone());
+    let client_tor_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).build().unwrap_or_else(|_| client_incognito.clone());
+
+    let ctx = ProxyContext { tor_state, privacy, blocked_count, blocklist, app_handle, referer_map, incognito_jar, client_normal, client_incognito, client_tor, client_tor_incognito };
 
     let app = Router::new()
-        .route("/proxy", get(handle_proxy))
-        .route("/readability", get(handle_readability))
-        .route("/ac", get(handle_autocomplete))
+        .route("/proxy", get(handle_proxy).options(handle_options))
+        .route("/readability", get(handle_readability).options(handle_options))
+        .route("/ac", get(handle_autocomplete).options(handle_options))
         .fallback(axum::routing::any(handle_fallback))
         .layer(Extension(ctx));
         
@@ -251,20 +260,24 @@ pub async fn start_proxy(
     axum::serve(listener, app).await.unwrap();
 }
 
-fn build_client(ctx: &ProxyContext) -> Client {
-    let mut client_builder = Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-        .danger_accept_invalid_certs(true);
-        
+async fn handle_options() -> impl axum::response::IntoResponse {
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, OPTIONS, POST")
+        .header("Access-Control-Allow-Headers", "*")
+        .body(axum::body::Body::empty())
+        .unwrap()
+}
+
+fn build_client(ctx: &ProxyContext, is_incognito: bool) -> Client {
     let tor_enabled = *ctx.tor_state.lock().unwrap();
-    if tor_enabled {
-        if let Ok(proxy) = reqwest::Proxy::all("socks5h://127.0.0.1:9050") {
-            client_builder = client_builder.proxy(proxy);
-        }
+    match (is_incognito, tor_enabled) {
+        (false, false) => ctx.client_normal.clone(),
+        (true, false) => ctx.client_incognito.clone(),
+        (false, true) => ctx.client_tor.clone(),
+        (true, true) => ctx.client_tor_incognito.clone(),
     }
-    
-    client_builder.build().unwrap()
 }
 
 /// Apply HTTPS-only upgrade to URL
@@ -276,12 +289,60 @@ fn maybe_upgrade_https(url: &str, settings: &PrivacySettings) -> String {
     }
 }
 
+fn validate_proxy_request(headers: &HeaderMap, target_url: &str) -> Result<Url, (StatusCode, &'static str)> {
+    let is_valid_origin = headers.get("origin")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.starts_with("tauri://") || v.starts_with("http://localhost") || v.starts_with("https://tauri.localhost"))
+        .unwrap_or(false) || headers.get("referer")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.starts_with("tauri://") || v.starts_with("http://localhost") || v.starts_with("https://tauri.localhost") || v.starts_with("http://127.0.0.1:8181"))
+        .unwrap_or(false);
+
+    if !is_valid_origin && !headers.contains_key("sec-fetch-dest") {
+        if headers.get("origin").is_some() || headers.get("referer").is_some() {
+            if !is_valid_origin {
+                return Err((StatusCode::FORBIDDEN, "Invalid origin"));
+            }
+        }
+    }
+
+    let parsed_url = match Url::parse(target_url) {
+        Ok(url) => url,
+        Err(_) => return Err((StatusCode::BAD_REQUEST, "Invalid URL")),
+    };
+
+    if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
+        return Err((StatusCode::FORBIDDEN, "Only HTTP/HTTPS allowed"));
+    }
+
+    if let Some(host) = parsed_url.host_str() {
+        let is_local = host == "localhost" 
+            || host == "127.0.0.1" 
+            || host == "::1" 
+            || host.starts_with("192.168.") 
+            || host.starts_with("10.") 
+            || (host.starts_with("172.") && host[4..].split('.').next().unwrap_or("0").parse::<u8>().unwrap_or(0) >= 16 && host[4..].split('.').next().unwrap_or("0").parse::<u8>().unwrap_or(0) <= 31);
+            
+        if is_local {
+            return Err((StatusCode::FORBIDDEN, "Local network access forbidden"));
+        }
+    }
+
+    Ok(parsed_url)
+}
+
 async fn handle_proxy(
+    headers: HeaderMap,
     Query(params): Query<ProxyQuery>,
     Extension(ctx): Extension<ProxyContext>,
 ) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_proxy_request(&headers, &params.url) {
+        return Response::builder().status(status).body(axum::body::Body::from(msg)).unwrap();
+    }
+
+    let is_incognito = params.incognito.unwrap_or(false);
     let settings = ctx.privacy.lock().unwrap().clone();
-    let is_normal = settings.normal_mode;
+    let is_normal = settings.normal_mode && !is_incognito;
     
     // Ad blocking check (skip in normal mode)
     if !is_normal && settings.ad_blocker && is_blocked(&params.url, &ctx.blocklist) {
@@ -295,11 +356,24 @@ async fn handle_proxy(
             .unwrap();
     }
 
-    let client = build_client(&ctx);
+    let client = build_client(&ctx, is_incognito);
     let target_url = maybe_upgrade_https(&params.url, &settings);
     let is_raw = params.raw.unwrap_or(false);
 
     let mut request = client.get(&target_url);
+    
+    // Forward original request headers
+    for (key, val) in headers.iter() {
+        let k = key.as_str().to_lowercase();
+        if k != "host" && k != "connection" && k != "content-length" && k != "accept-encoding" && !k.starts_with("sec-fetch-") {
+            request = request.header(key, val);
+        }
+    }
+    
+    // Spoof sec-fetch headers so sites don't block the proxy iframe
+    request = request.header("Sec-Fetch-Dest", "document");
+    request = request.header("Sec-Fetch-Mode", "navigate");
+    request = request.header("Sec-Fetch-Site", "cross-site");
     
     // Strip referer in privacy mode
     if !is_normal && settings.strip_referer {
@@ -307,7 +381,7 @@ async fn handle_proxy(
     }
     
     // Block cookies
-    if !is_normal && settings.block_cookies {
+    if (!is_normal && settings.block_cookies) || is_incognito {
         request = request.header("Cookie", "");
     }
 
@@ -353,8 +427,12 @@ async fn handle_proxy(
                 if key_str.starts_with("access-control-allow-") {
                     continue;
                 }
-                // Block Set-Cookie in privacy mode
-                if !is_normal && settings.block_cookies && key_str == "set-cookie" {
+                // Strip security headers that prevent iframe loading or script injection
+                if key_str == "content-security-policy" || key_str == "content-security-policy-report-only" || key_str == "x-frame-options" {
+                    continue;
+                }
+                // Block Set-Cookie in privacy mode or incognito
+                if ((!is_normal && settings.block_cookies) || is_incognito) && key_str == "set-cookie" {
                     continue;
                 }
                 builder = builder.header(key.as_str(), val.as_bytes());
@@ -368,6 +446,11 @@ async fn handle_proxy(
                 let style_tag = "<style>html, body { display: block !important; visibility: visible !important; opacity: 1 !important; }</style>";
                 let script_tag = format!(r#"<script>
                   const ORIGINAL_URL = "{}";
+                  document.addEventListener('contextmenu', function(e) {{
+                      // We block the default context menu because "Inspect Element" will inspect the Veil UI instead of this iframe.
+                      // True Webview-level inspect is currently unavailable for proxy iframes.
+                      e.preventDefault();
+                  }});
                   document.addEventListener('click', function(e) {{
                     let a = e.target.closest('a');
                     if (a && a.getAttribute('href') && !a.getAttribute('href').startsWith('javascript:')) {{
@@ -406,6 +489,26 @@ async fn handle_proxy(
                     }});
                     const t = document.querySelector('title');
                     if(t) obs.observe(t, {{ childList: true }});
+                  window.addEventListener('message', function(e) {{
+                    if (e.data && e.data.type === 'capture-screenshot') {{
+                        if (!window.html2canvas) {{
+                            let s = document.createElement('script');
+                            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                            s.onload = () => takeScreenshot();
+                            document.head.appendChild(s);
+                        }} else {{
+                            takeScreenshot();
+                        }}
+                        function takeScreenshot() {{
+                            window.html2canvas(document.documentElement, {{ useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }}).then(canvas => {{
+                                canvas.toBlob(blob => {{
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => window.parent.postMessage({{ type: 'screenshot-result', dataUrl: reader.result }}, '*');
+                                    reader.readAsDataURL(blob);
+                                }});
+                            }});
+                        }}
+                    }}
                   }});
                 </script>"#, final_url);
                 
@@ -447,6 +550,7 @@ async fn handle_proxy(
             }
         }
         Err(e) => {
+            println!("Proxy request failed: {}", e);
             let error_html = format!(r#"
 <!DOCTYPE html>
 <html>
@@ -539,11 +643,15 @@ async fn handle_proxy(
 }
 
 async fn handle_readability(
+    headers: HeaderMap,
     Query(params): Query<ProxyQuery>,
     Extension(ctx): Extension<ProxyContext>,
 ) -> impl IntoResponse {
+    if let Err((status, msg)) = validate_proxy_request(&headers, &params.url) {
+        return Response::builder().status(status).body(axum::body::Body::from(msg)).unwrap();
+    }
     let target_url = params.url;
-    let client = build_client(&ctx);
+    let client = build_client(&ctx, params.incognito.unwrap_or(false));
 
     match client.get(&target_url).send().await {
         Ok(res) => {
@@ -591,10 +699,14 @@ async fn handle_readability(
 }
 
 async fn handle_autocomplete(
+    headers: HeaderMap,
     Query(params): Query<ProxyQuery>,
     Extension(ctx): Extension<ProxyContext>,
 ) -> impl IntoResponse {
-    let client = build_client(&ctx);
+    if let Err((status, msg)) = validate_proxy_request(&headers, "https://duckduckgo.com/") {
+        return Response::builder().status(status).body(axum::body::Body::from(msg)).unwrap();
+    }
+    let client = build_client(&ctx, false);
     let url = format!("https://duckduckgo.com/ac/?q={}&type=list", urlencoding::encode(&params.url));
     
     match client.get(&url).send().await {
@@ -626,19 +738,25 @@ async fn handle_fallback(
     };
     
     let mut base_target_str = String::new();
+    let mut is_incognito = false;
     
     if let Ok(ref_url) = Url::parse(referer) {
         if ref_url.path() == "/proxy" {
-            if let Some((_, v)) = ref_url.query_pairs().find(|(k, _)| k == "url") {
-                base_target_str = v.into_owned();
+            for (k, v) in ref_url.query_pairs() {
+                if k == "url" {
+                    base_target_str = v.into_owned();
+                } else if k == "incognito" && v == "true" {
+                    is_incognito = true;
+                }
             }
         }
     }
     
     if base_target_str.is_empty() {
         let map = ctx.referer_map.lock().unwrap();
-        if let Some(target) = map.get(referer) {
+        if let Some((target, inc)) = map.get(referer) {
             base_target_str = target.clone();
+            is_incognito = *inc;
         }
     }
     
@@ -646,16 +764,20 @@ async fn handle_fallback(
         return Response::builder().status(404).body(axum::body::Body::from("Not Found")).unwrap();
     }
     
+    let path_and_query = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/");
     let base_target = match Url::parse(&base_target_str) {
         Ok(u) => u,
         Err(_) => return Response::builder().status(404).body(axum::body::Body::from("Not Found")).unwrap(),
     };
     
-    let path_and_query = uri.path_and_query().map(|pq| pq.as_str()).unwrap_or("/");
     let resolved_url = match base_target.join(path_and_query) {
         Ok(u) => u.to_string(),
         Err(_) => return Response::builder().status(404).body(axum::body::Body::from("Not Found")).unwrap(),
     };
+
+    if let Err((status, msg)) = validate_proxy_request(&headers, &resolved_url) {
+        return Response::builder().status(status).body(axum::body::Body::from(msg)).unwrap();
+    }
     
     let current_url = format!("http://127.0.0.1:8181{}", path_and_query);
     {
@@ -663,12 +785,13 @@ async fn handle_fallback(
         if map.len() > 10000 {
             map.clear();
         }
-        map.insert(current_url, resolved_url.clone());
+        map.insert(current_url, (resolved_url.clone(), is_incognito));
     }
     
     // Ad blocking check for sub-resources
     let settings = ctx.privacy.lock().unwrap().clone();
-    if !settings.normal_mode && settings.ad_blocker && is_blocked(&resolved_url, &ctx.blocklist) {
+    let is_normal = settings.normal_mode && !is_incognito;
+    if !is_normal && settings.ad_blocker && is_blocked(&resolved_url, &ctx.blocklist) {
         let mut count = ctx.blocked_count.lock().unwrap();
         *count += 1;
         return Response::builder()
@@ -679,7 +802,7 @@ async fn handle_fallback(
             .unwrap();
     }
     
-    let client = build_client(&ctx);
+    let client = build_client(&ctx, is_incognito);
     
     let res = match client.get(&resolved_url).send().await {
         Ok(r) => r,
@@ -698,7 +821,7 @@ async fn handle_fallback(
             continue;
         }
         // Block Set-Cookie in privacy mode
-        if !settings.normal_mode && settings.block_cookies && key_str == "set-cookie" {
+        if (!is_normal && settings.block_cookies) && key_str == "set-cookie" {
             continue;
         }
         builder = builder.header(key.as_str(), val.as_bytes());

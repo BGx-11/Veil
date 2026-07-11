@@ -11,8 +11,10 @@ export default function Passwords() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+  const [confirmModal, setConfirmModal] = useState<{ title: string, message: string, onConfirm: () => void } | null>(null);
   
   const [formData, setFormData] = useState({ domain: '', username: '', password: '' });
+  const [isAdding, setIsAdding] = useState(false);
 
   const filteredPasswords = useMemo(() => {
     if (!searchQuery.trim()) return passwords;
@@ -47,6 +49,7 @@ export default function Passwords() {
     
     setEditingId(null);
     setFormData({ domain: '', username: '', password: '' });
+    setIsAdding(false);
   };
 
   const handleEdit = (entry: PasswordEntry) => {
@@ -55,10 +58,14 @@ export default function Passwords() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this password?')) {
-      updateSettings({ passwords: passwords.filter(p => p.id !== id) });
-      addToast('Password deleted', 'info');
-    }
+    setConfirmModal({
+      title: 'Delete Password',
+      message: 'Are you sure you want to delete this password? This action cannot be undone.',
+      onConfirm: () => {
+        updateSettings({ passwords: passwords.filter(p => p.id !== id) });
+        addToast('Password deleted', 'info');
+      }
+    });
   };
 
   const toggleVisibility = (id: string) => {
@@ -93,6 +100,7 @@ export default function Passwords() {
             onClick={() => {
               setEditingId(null);
               setFormData({ domain: '', username: '', password: '' });
+              setIsAdding(true);
               // Smooth scroll to editor
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
@@ -103,7 +111,7 @@ export default function Passwords() {
         </div>
 
         {/* Editor Panel */}
-        {(editingId || formData.domain !== '' || formData.username !== '' || formData.password !== '') && (
+        {(isAdding || editingId || formData.domain !== '' || formData.username !== '' || formData.password !== '') && (
           <div className="glass-panel p-6 mb-8 animate-fade-in border border-[var(--accent-primary)] shadow-[0_0_20px_rgba(79,70,229,0.15)] relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
               <Key size={100} />
@@ -163,6 +171,7 @@ export default function Passwords() {
                 onClick={() => {
                   setEditingId(null);
                   setFormData({ domain: '', username: '', password: '' });
+                  setIsAdding(false);
                 }}
                 className="px-5 py-2.5 rounded-xl text-sm font-medium glass-btn text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
               >
@@ -213,7 +222,7 @@ export default function Passwords() {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl glass-btn flex items-center justify-center text-[var(--accent-primary)] flex-shrink-0">
                         <img 
-                          src={`https://www.google.com/s2/favicons?domain=${entry.domain}&sz=32`} 
+                          src={`https://icons.duckduckgo.com/ip3/${entry.domain}.ico`} 
                           alt="" 
                           className="w-5 h-5 rounded-sm"
                           onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -263,8 +272,40 @@ export default function Passwords() {
             })}
           </div>
         )}
-
       </div>
+
+
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+          <div className="glass-panel-heavy p-6 w-full max-w-sm">
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2 tracking-tight">
+              {confirmModal.title}
+            </h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-6">
+              {confirmModal.message}
+            </p>
+            <div className="flex justify-end gap-2 mt-2">
+              <button 
+                onClick={() => setConfirmModal(null)} 
+                className="px-4 py-2 rounded-xl text-sm font-medium glass-btn text-[var(--text-secondary)] hover:bg-[var(--surface-icon-hover)] transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium glass-btn-accent shadow-md transition-all text-red-50"
+                style={{ background: 'var(--danger)' }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

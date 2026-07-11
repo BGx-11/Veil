@@ -193,7 +193,7 @@ export function useKeyboardShortcuts(
         e.preventDefault();
         if (wvRefs) {
           import('@/app/ScreenshotTool').then(mod => {
-            mod.captureScreenshot(addToast, wvRefs);
+            mod.captureScreenshot(addToast);
           });
         }
       }

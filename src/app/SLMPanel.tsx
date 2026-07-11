@@ -19,6 +19,7 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [modelError, setModelError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [translateOpen, setTranslateOpen] = useState(false);
   const [currentModel, setCurrentModel] = useState<string>('');
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   
@@ -69,7 +70,7 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
 
     try {
       if (generatorRef.current && !modelError) {
-        const systemPrompt = `You are Veil AI, an advanced, secure, and highly intelligent browser assistant. Your primary goal is to provide accurate, helpful, and exceptionally well-reasoned answers based on the context provided. Think step-by-step and be concise but thorough. Keep responses concise unless asked for details.`;
+        const systemPrompt = `You are Veil AI, an advanced, secure, and highly intelligent browser assistant built directly into the Veil Browser. Your primary goal is to provide accurate, helpful, and exceptionally well-reasoned answers. You must NOT hallucinate features, URLs, or download packages (e.g., do not say "The internal link veil refers to a download package"). Keep responses concise unless asked for details.`;
         const messagesArray = [
           { role: 'system', content: systemPrompt },
           ...messages.filter(m => m.role !== 'system'),
@@ -99,7 +100,10 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
   };
 
   const handleStop = () => abortController?.abort();
-  const translatePage = () => handleSend(undefined, "Please translate the content of this page to English.");
+  const translatePage = (lang: string = "English") => {
+    setTranslateOpen(false);
+    handleSend(undefined, `Please translate the content of this page to ${lang}.`);
+  };
   const summarizePage = () => handleSend(undefined, "Please summarize the content of this page.");
 
   if (!isOpen) return null;
@@ -124,7 +128,7 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
           <ChevronDown size={14} className={`text-[var(--text-tertiary)] transition-transform ${showSettings ? 'rotate-180' : ''}`} />
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 relative">
           <button
             onClick={summarizePage}
             title="Summarize Page"
@@ -132,13 +136,41 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
           >
             <FileText size={14} />
           </button>
-          <button
-            onClick={translatePage}
-            title="Translate Page"
-            className="w-8 h-8 flex items-center justify-center rounded-xl glass-btn text-[var(--text-secondary)] transition-colors"
-          >
-            <Languages size={14} />
-          </button>
+          
+          <div className="relative">
+            <button
+              onClick={() => {
+                if (showSettings) setShowSettings(false);
+                setTranslateOpen(!translateOpen);
+              }}
+              title="Translate Page"
+              className={`w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${translateOpen ? 'glass-panel shadow-inner text-[var(--accent-primary)] border border-indigo-200/50' : 'glass-btn text-[var(--text-secondary)]'}`}
+            >
+              <Languages size={14} />
+            </button>
+            <AnimatePresence>
+              {translateOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                  className="absolute right-0 top-full mt-2 w-40 glass-panel-heavy p-2 z-50 flex flex-col gap-1 rounded-xl shadow-xl border border-[var(--glass-border)]"
+                >
+                  <span className="text-xs font-semibold px-2 py-1 text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Translate To</span>
+                  {['English', 'Spanish', 'French', 'German', 'Hindi', 'Japanese', 'Chinese'].map(lang => (
+                    <button
+                      key={lang}
+                      onClick={() => translatePage(lang)}
+                      className="text-left px-3 py-2 rounded-lg text-sm font-medium hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] transition-colors"
+                    >
+                      {lang}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <button
             onClick={() => setMessages([{ role: 'assistant', content: 'Hello! I am Veil AI. How can I help you today?' }])}
             title="Clear Chat"

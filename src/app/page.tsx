@@ -1,429 +1,298 @@
-'use client';
-
-import React, { useEffect, useState, useRef } from 'react';
-import { Shield, Download, Lock, Globe, Zap, Bot, EyeOff, ChevronDown, Fingerprint, Wifi, Eye, BookOpen, Columns2, Search, X, AlertTriangle, CheckCircle2, GitCommit, HelpCircle, MessageSquare, Mail, User, LayoutGrid, Heart, Clock, MoreHorizontal } from 'lucide-react';
-import './landing.css';
-
-const GithubIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.02c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A4.8 4.8 0 0 0 8 18v4"></path>
-  </svg>
-);
-
-function useInView(ref: React.RefObject<HTMLElement | null>, threshold = 0.15) {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    if (!ref.current) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setVisible(true); }, { threshold });
-    obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, [ref, threshold]);
-  return visible;
-}
+"use client";
+import { AuroraBackground } from "@/components/ui/aurora-background";
+import { motion, useScroll, useTransform, Variants } from "framer-motion";
+import { Download, Shield, Zap, Lock, BrainCircuit, GitBranch, Monitor, Ghost, Search, SplitSquareHorizontal, BookOpen, AlertCircle, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRef } from "react";
 
 export default function LandingPage() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [showModal, setShowModal] = useState(false);
-  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'completed'>('idle');
-  
-  const heroRef = useRef<HTMLElement>(null);
-  const featRef = useRef<HTMLElement>(null);
-  const privRef = useRef<HTMLElement>(null);
-  const featVisible = useInView(featRef);
-  const privVisible = useInView(privRef);
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end start"],
+  });
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    const onMouse = (e: MouseEvent) => setMousePos({ x: e.clientX, y: e.clientY });
-    window.addEventListener('scroll', onScroll);
-    window.addEventListener('mousemove', onMouse);
-    
-    return () => { 
-      window.removeEventListener('scroll', onScroll); 
-      window.removeEventListener('mousemove', onMouse); 
-    };
-  }, []);
+  const yHero = useTransform(scrollYProgress, [0, 1], [0, 150]);
+  const opacityHero = useTransform(scrollYProgress, [0, 0.4], [1, 0]);
+
+  // Framer Motion Variants - Sped up!
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+    },
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20, filter: "blur(5px)" },
+    visible: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { type: "spring", stiffness: 120, damping: 15 },
+    },
+  };
+
+  const featuresContainerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+    },
+  };
+
+  const featureItemVariants: Variants = {
+    hidden: { opacity: 0, scale: 0.95, y: 20 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: { type: "spring", stiffness: 100, damping: 15 },
+    },
+  };
 
   return (
-    <div className={`lp ${showModal ? 'lp-modal-open' : ''}`}>
-      {/* Cursor glow */}
-      <div className="cursor-glow" style={{ left: mousePos.x, top: mousePos.y }} />
-
-      {/* Nav */}
-      <nav className={`lp-nav ${scrolled ? 'lp-nav--scrolled' : ''}`}>
-        <div className="lp-nav__inner">
-          <div className="lp-logo">
-            <img src="/logo.png" alt="Veil" width={32} height={32} className="lp-logo__img" />
-            <span>Veil</span>
-          </div>
-          <div className="lp-nav__links">
-            <a href="#features">Features</a>
-            <a href="#privacy">Privacy</a>
-          </div>
-          <button onClick={() => setShowModal(true)} className="lp-nav__cta" style={{ border: 'none', cursor: 'pointer' }}>
-            <Download size={16} /> Download
-          </button>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section ref={heroRef} className="lp-hero">
-        <div className="lp-hero__orbs">
-          <div className="orb orb--blue" />
-          <div className="orb orb--purple" />
-          <div className="orb orb--cyan" />
-        </div>
-        <div className="lp-hero__content">
-          <h1 className="lp-hero__title">
-            Browse the web<br /><span className="lp-hero__gradient">without a trace.</span>
-          </h1>
-          <p className="lp-hero__sub">
-            Veil is the next-generation browser with built-in Tor, ad blocking, and on-device AI — engineered so your data never leaves your machine.
-          </p>
-          <div className="lp-hero__actions">
-            <button onClick={() => setShowModal(true)} className="lp-btn lp-btn--primary">
-              <Download size={18} /> Download for Windows
-            </button>
-            <a href="https://github.com/BGx-11/Veil" className="lp-btn lp-btn--ghost">
-              View on GitHub
-            </a>
-          </div>
-          <div style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-3)', opacity: 0.8, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#0078D6', marginRight: '8px' }}></span>
-            Windows Only For Now
-          </div>
-          <div className="lp-hero__scroll">
-            <ChevronDown size={20} className="bounce" />
-          </div>
-        </div>
-
-        {/* Browser Mockup */}
-        <div className="lp-mockup">
-          <div className="lp-mockup__window">
-            <div className="lp-mockup__sidebar">
-              <div className="mock-sidebar-top">
-                <div className="mock-window-controls">
-                  <span className="dot dot-close" />
-                  <span className="dot dot-min" />
-                  <span className="dot dot-max" />
-                </div>
-                <div className="mock-sidebar-user"><User size={16} /></div>
-                <div className="mock-sidebar-apps">
-                  <div className="mock-app text-indigo-600"><Globe size={18} /></div>
-                  <div className="mock-app text-purple-600"><Bot size={18} /></div>
-                  <div className="mock-app text-teal-600"><LayoutGrid size={18} /></div>
-                </div>
-              </div>
-              <div className="mock-sidebar-bottom">
-                <Heart size={16} className="text-[var(--text-tertiary)]" />
-                <Clock size={16} className="text-[var(--text-tertiary)]" />
-                <MoreHorizontal size={16} className="text-[var(--text-tertiary)]" />
-              </div>
+    <div className="bg-zinc-50 dark:bg-zinc-950 font-sans selection:bg-accent-primary/30">
+      <AuroraBackground>
+        <div ref={containerRef} className="relative z-10 flex flex-col min-h-screen w-full">
+          {/* Navigation */}
+          <motion.nav 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="w-full flex items-center justify-between p-6 md:px-12 max-w-7xl mx-auto absolute top-0 left-0 right-0 z-50"
+          >
+            <div className="flex items-center gap-3 group cursor-pointer">
+              <Image src="/logo.png" alt="Veil Logo" width={40} height={40} className="group-hover:scale-105 transition-transform duration-300 drop-shadow-md rounded-xl" />
+              <span className="text-2xl font-bold tracking-tight dark:text-white text-zinc-900">
+                Veil
+              </span>
             </div>
+            <div className="flex items-center gap-8">
+              <Link href="#features" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors">
+                Features
+              </Link>
+              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors flex items-center gap-2 group">
+                <GitBranch className="w-4 h-4 group-hover:scale-110 transition-transform" /> Source
+              </a>
+              <a href="/Veil_Browser_Setup.exe" download className="relative overflow-hidden group bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-5 py-2.5 rounded-full text-sm font-semibold flex items-center gap-2 shadow-lg transition-all hover:scale-105">
+                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+                <span className="relative z-10 flex items-center gap-2 group-hover:text-white transition-colors duration-300">
+                  <Download className="w-4 h-4" /> Download
+                </span>
+              </a>
+            </div>
+          </motion.nav>
+
+          {/* Hero Section */}
+          <motion.div
+            style={{ y: yHero, opacity: opacityHero }}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="flex-1 flex flex-col items-center justify-center text-center max-w-5xl mx-auto px-4 pt-32 pb-20"
+          >
+            <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-extrabold tracking-tight text-zinc-900 dark:text-white max-w-4xl leading-[1.1] mb-6">
+              Browse beyond <br />
+              <span className="relative inline-block">
+                <span className="absolute -inset-1 blur-2xl bg-gradient-to-r from-indigo-600 to-purple-500 opacity-40 dark:opacity-30 rounded-full"></span>
+                <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-zinc-800 to-zinc-500 dark:from-white dark:to-zinc-400 drop-shadow-sm">
+                  the surface.
+                </span>
+              </span>
+            </motion.h1>
             
-            <div className="lp-mockup__main">
-              <div className="lp-mockup__toolbar">
-                 <div className="mock-toolbar-nav">
-                   <div className="mock-nav-btn"><ChevronDown size={16} style={{transform: 'rotate(90deg)'}} /></div>
-                   <div className="mock-nav-btn"><ChevronDown size={16} style={{transform: 'rotate(-90deg)'}} /></div>
-                   <div className="mock-nav-btn"><Search size={14} /></div>
-                 </div>
-                 <div className="mock-toolbar-address">
-                   <div className="mock-address-inner">
-                     <Shield size={14} className="text-emerald-400" />
-                     <Lock size={12} className="text-[var(--text-tertiary)]" />
-                     <span className="text-[var(--text-secondary)]">https://</span><span className="text-[var(--text-primary)]">veil.browser</span>
-                   </div>
-                 </div>
-                 <div className="mock-toolbar-actions">
-                   <div className="mock-tor-badge">
-                     <span className="mock-tor-dot"></span>
-                     Connected
-                   </div>
-                 </div>
-              </div>
-              
-              <div className="lp-mockup__tabs">
-                <div className="mock-tab mock-tab--active">
-                  <Globe size={12} className="text-indigo-400"/> <span>Veil Search</span>
-                </div>
-                <div className="mock-tab">
-                  <Shield size={12} className="text-emerald-600"/> <span>Privacy Report</span>
-                </div>
-                <div className="mock-tab-new">
-                   +
-                </div>
-              </div>
+            <motion.p variants={itemVariants} className="text-xl md:text-2xl text-zinc-600 dark:text-zinc-400 max-w-2xl mt-4 leading-relaxed font-light">
+              The private, AI-powered desktop browser. Featuring on-device summarization, integrated tracking protection, and seamless Tor routing.
+            </motion.p>
+            
+            <motion.div variants={itemVariants} className="flex flex-col items-center gap-6 mt-12 w-full">
+              <motion.a 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                href="/Veil_Browser_Setup.exe" 
+                download
+                className="relative overflow-hidden group bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-5 rounded-full text-xl font-bold flex items-center justify-center gap-3 shadow-[0_10px_40px_rgba(79,70,229,0.5)] text-white w-full sm:w-auto"
+              >
+                <div className="absolute inset-0 w-full h-full bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out"></div>
+                <Download className="w-6 h-6 relative z-10" />
+                <span className="relative z-10">Download for Windows</span>
+              </motion.a>
+              <motion.p variants={itemVariants} className="text-sm font-medium text-zinc-500 dark:text-zinc-500 flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Free & Open Source • Windows 10/11 (64-bit)
+              </motion.p>
+            </motion.div>
+          </motion.div>
+        </div>
+      </AuroraBackground>
 
-              <div className="lp-mockup__content">
-                 <div className="mock-webpage">
-                   <div className="mock-hero">
-                     <div className="mock-hero-title">Private Search</div>
-                     <div className="mock-search-box">
-                       <Search size={18} className="text-[var(--text-tertiary)]" />
-                       <span>Search without being tracked...</span>
-                     </div>
-                   </div>
-                   <div className="mock-cards">
-                     <div className="mock-card"></div>
-                     <div className="mock-card"></div>
-                     <div className="mock-card"></div>
-                   </div>
-                 </div>
+      {/* Main Content Area */}
+      <div className="w-full bg-white dark:bg-zinc-950 relative z-20">
+        
+        {/* Features Grid */}
+        <section id="features" className="py-24 px-6 md:px-12 max-w-7xl mx-auto">
+          <motion.div 
+            variants={featuresContainerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            className="text-center mb-20"
+          >
+            <motion.h2 variants={featureItemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-white mb-4">
+              Everything you need. <span className="text-accent-primary">Nothing you don't.</span>
+            </motion.h2>
+          </motion.div>
+
+          <motion.div 
+            variants={featuresContainerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {/* Feature Cards */}
+            <FeatureCard icon={<Ghost />} title="Ghostery Blocker" desc="Network-level ad & tracker blocking. Stops scripts before they even load." color="from-blue-500/10 to-indigo-500/10" textCol="text-blue-500" />
+            <FeatureCard icon={<Lock />} title="Tor Network" desc="One-click SOCKS5 proxy through the Tor network. Real anonymity, not theater." color="from-purple-500/10 to-pink-500/10" textCol="text-purple-500" />
+            <FeatureCard icon={<BrainCircuit />} title="On-Device AI" desc="WebGPU-accelerated LLM runs locally. Summarizes pages with zero cloud calls." color="from-emerald-500/10 to-teal-500/10" textCol="text-emerald-500" />
+            <FeatureCard icon={<Shield />} title="Anti-Fingerprint" desc="Canvas noise injection and WebRTC leak protection. Be invisible." color="from-orange-500/10 to-red-500/10" textCol="text-orange-500" />
+            
+            <FeatureCard icon={<BookOpen />} title="Reader Mode" desc="Distraction-free reading with beautiful typography. Focus on content." color="from-zinc-500/10 to-stone-500/10" textCol="text-zinc-500" />
+            <FeatureCard icon={<SplitSquareHorizontal />} title="Split View" desc="Side-by-side tab multitasking. Research and browse simultaneously." color="from-cyan-500/10 to-blue-500/10" textCol="text-cyan-500" />
+            <FeatureCard icon={<Search />} title="Private Search" desc="DuckDuckGo integration with AI summaries. No tracking, no profiling." color="from-amber-500/10 to-orange-500/10" textCol="text-amber-500" />
+            <FeatureCard icon={<Zap />} title="Blazing Fast" desc="Tauri + Rust + Next.js. Ultra-lightweight native rendering." color="from-yellow-500/10 to-amber-500/10" textCol="text-yellow-500" />
+          </motion.div>
+        </section>
+
+        {/* Privacy Promise Section */}
+        <section className="py-24 bg-zinc-100/50 dark:bg-zinc-900/30 border-y border-zinc-200 dark:border-zinc-800">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center gap-12">
+            <div className="md:w-1/2">
+              <h2 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-6">
+                Your data stays <span className="text-accent-primary">yours.</span>
+              </h2>
+              <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
+                Unlike Chrome, Edge, or Safari — Veil doesn't collect telemetry, sync your history to corporate servers, or sell your search queries to advertisers. Every AI inference runs on your GPU. Every search is private. Every session is ephemeral.
+              </p>
+              <ul className="space-y-4">
+                <li className="flex items-center gap-3 text-zinc-700 dark:text-zinc-300 font-medium">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" /> End-to-end encrypted sessions
+                </li>
+                <li className="flex items-center gap-3 text-zinc-700 dark:text-zinc-300 font-medium">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" /> Tor network routing
+                </li>
+                <li className="flex items-center gap-3 text-zinc-700 dark:text-zinc-300 font-medium">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" /> Zero telemetry collection
+                </li>
+                <li className="flex items-center gap-3 text-zinc-700 dark:text-zinc-300 font-medium">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" /> Anti-fingerprinting tech
+                </li>
+              </ul>
+            </div>
+            <div className="md:w-1/2 p-8 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl">
+              <div className="flex items-center gap-3 mb-4 text-accent-primary">
+                <GitBranch className="w-6 h-6" />
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Open Source Transparency</h3>
               </div>
+              <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+                Veil is an open-source project released under the MIT License. It does not phone home, it does not auto-update without consent, and it is strictly driven by the community. We recommend reviewing the source code on GitHub.
+              </p>
+              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-medium text-accent-primary hover:underline">
+                Audit on GitHub &rarr;
+              </a>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features */}
-      <section ref={featRef} id="features" className={`lp-features ${featVisible ? 'visible' : ''}`}>
-        <h2 className="lp-section__title">Everything you need.<br /><span className="lp-hero__gradient">Nothing you don't.</span></h2>
-        <div className="lp-features__grid">
-          {[
-            { icon: <EyeOff size={24} />, title: 'Ghostery Blocker', desc: 'Network-level ad & tracker blocking. Stops scripts before they even load.', color: '#ef4444' },
-            { icon: <Globe size={24} />, title: 'Tor Network', desc: 'One-click SOCKS5 proxy through the Tor network. Real anonymity, not theater.', color: '#a855f7' },
-            { icon: <Bot size={24} />, title: 'On-Device AI', desc: 'WebGPU-accelerated LLM runs locally. Summarizes pages with zero cloud calls.', color: '#3b82f6' },
-            { icon: <Fingerprint size={24} />, title: 'Anti-Fingerprint', desc: 'Canvas noise injection and WebRTC leak protection. Be invisible.', color: '#14b8a6' },
-            { icon: <BookOpen size={24} />, title: 'Reader Mode', desc: 'Distraction-free reading with beautiful typography. Focus on content.', color: '#f59e0b' },
-            { icon: <Columns2 size={24} />, title: 'Split View', desc: 'Side-by-side tab multitasking. Research and browse simultaneously.', color: '#06b6d4' },
-            { icon: <Search size={24} />, title: 'Private Search', desc: 'DuckDuckGo integration with AI summaries. No tracking, no profiling.', color: '#8b5cf6' },
-            { icon: <Zap size={24} />, title: 'Blazing Fast', desc: 'Tauri + Rust + Next.js. Ultra-lightweight native rendering.', color: '#22c55e' },
-          ].map((f, i) => (
-            <div key={i} className="lp-fcard" style={{ animationDelay: `${i * 0.08}s`, '--card-accent': f.color } as React.CSSProperties}>
-              <div className="lp-fcard__icon" style={{ background: `${f.color}15`, color: f.color }}>{f.icon}</div>
-              <h3>{f.title}</h3>
-              <p>{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Privacy Deep Dive */}
-      <section ref={privRef} id="privacy" className={`lp-privacy ${privVisible ? 'visible' : ''}`}>
-        <div className="lp-privacy__inner">
-          <h2 className="lp-section__title">Your data stays <span className="lp-hero__gradient">yours.</span></h2>
-          <p className="lp-privacy__text">
-            Unlike Chrome, Edge, or Safari — Veil doesn't collect telemetry, sync your history to corporate servers, or sell your search queries to advertisers. Every AI inference runs on your GPU. Every search is private. Every session is ephemeral.
-          </p>
-          <div className="lp-privacy__features">
-            <div className="lp-priv-item"><Lock size={20} /><span>End-to-end encrypted sessions</span></div>
-            <div className="lp-priv-item"><Wifi size={20} /><span>Tor network routing</span></div>
-            <div className="lp-priv-item"><Eye size={20} /><span>Zero telemetry collection</span></div>
-            <div className="lp-priv-item"><Fingerprint size={20} /><span>Anti-fingerprinting tech</span></div>
-          </div>
-        </div>
-      </section>
-
-      {/* Warning Banner / Open Source Notice */}
-      <section className="lp-warning-banner">
-        <div className="lp-warning-banner__inner">
-          <div className="lp-warning-banner__icon">
-            <AlertTriangle size={24} />
-          </div>
-          <div className="lp-warning-banner__content">
-            <h3>Open Source Transparency Notice</h3>
-            <p>
-              Veil is an open-source project released under the MIT License. It does not phone home, it does not auto-update without consent, and it is strictly driven by the community. We recommend reviewing the source code on GitHub.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Changelog */}
-      <section className="lp-changelog">
-        <div className="lp-changelog__inner">
-          <div className="lp-section-header">
-            <span className="lp-section-tag">Updates</span>
-            <h2>Release Notes</h2>
-            <p>Track the evolution of the Veil Browser project.</p>
-          </div>
-
-          <div className="lp-changelog__timeline">
-            <div className="lp-changelog__line-container">
-              <div className="lp-changelog__dot" />
-              <div className="lp-changelog__line" />
-            </div>
-            <div className="lp-changelog__content">
-              <div className="lp-changelog__version">
-                <h3>Version 1.1 (Pre-Release)</h3>
-                <span className="lp-changelog__badge">Latest</span>
+        {/* Release Notes & Support */}
+        <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16">
+          
+          {/* Updates */}
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2">Updates</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-8">Release Notes - Track the evolution of Veil.</p>
+            
+            <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 pl-8 pb-8">
+              <span className="absolute -left-2.5 top-0 w-5 h-5 rounded-full bg-accent-primary border-4 border-white dark:border-zinc-950"></span>
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Version 1.1 (Pre-Release)</h3>
+                <span className="bg-accent-primary/10 text-accent-primary text-xs px-2 py-1 rounded-full font-bold">Latest</span>
               </div>
-              <ul className="lp-changelog__list">
-                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</span></li>
-                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</span></li>
-                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</span></li>
-                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</span></li>
-                <li><CheckCircle2 size={18} className="lp-changelog__check"/> <span><strong>Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</span></li>
+              <ul className="space-y-4 text-zinc-600 dark:text-zinc-400">
+                <li><strong className="text-zinc-900 dark:text-zinc-200">Tor Network:</strong> Added Tor Progress UI and connection status feedback in the toolbar.</li>
+                <li><strong className="text-zinc-900 dark:text-zinc-200">Privacy Controls:</strong> Implemented Export/Import configuration tools to backup and restore settings.</li>
+                <li><strong className="text-zinc-900 dark:text-zinc-200">Proxy Layer:</strong> Enhanced CORS header filtering and proxy robustness for iframe rendering.</li>
+                <li><strong className="text-zinc-900 dark:text-zinc-200">UI & Design:</strong> Overhauled the landing page with an accurate light-themed browser mockup.</li>
+                <li><strong className="text-zinc-900 dark:text-zinc-200">Stability:</strong> Fixed IPC communication errors regarding privacy settings and stabilized history persistence.</li>
               </ul>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* FAQ Section */}
-      <section className="lp-faq">
-        <div className="lp-faq__inner">
-          <div className="lp-section-header">
-            <span className="lp-section-tag">Support</span>
-            <h2>Troubleshooting</h2>
-          </div>
-
-          <div className="lp-faq__list">
-            <div className="lp-faq-card">
-              <div className="lp-faq-card__header">
-                <HelpCircle size={20} color="#0078D6" />
-                <h3>Windows SmartScreen Warning</h3>
+          {/* Support / FAQ */}
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2">Support</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-8">Troubleshooting common installation issues.</p>
+            
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl">
+                <h4 className="flex items-center gap-2 font-bold text-zinc-900 dark:text-white mb-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500" /> Windows SmartScreen Warning
+                </h4>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                  Because Veil is an independent, open-source project, the <code>.exe</code> installer is not signed with an expensive EV certificate. Windows SmartScreen may flag it as an "Unrecognized App".
+                </p>
+                <div className="bg-zinc-100 dark:bg-zinc-950 p-3 rounded-lg text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                  Solution: Click <strong className="text-zinc-900 dark:text-white">More info</strong> on the blue popup, and then click <strong className="text-zinc-900 dark:text-white">Run anyway</strong>. You can verify the integrity by compiling it from GitHub.
+                </div>
               </div>
-              <p>
-                Because Veil is an independent, open-source project, the `.exe` installer is not signed with an expensive EV certificate. Windows SmartScreen may flag it as an "Unrecognized App".
-              </p>
-              <div className="lp-faq-card__solution">
-                <strong>Solution:</strong> Click <strong>More info</strong> on the blue SmartScreen popup, and then click <strong>Run anyway</strong>. You can verify the integrity of the release by compiling it yourself from the GitHub repository.
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl">
+                <h4 className="font-bold text-zinc-900 dark:text-white mb-2">Why is Tor disabled by default?</h4>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Tor significantly reduces browsing speeds due to onion routing across global nodes. We leave Tor disabled by default for general browsing, allowing you to manually toggle it ON when you need absolute anonymity.
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl">
+                <h4 className="font-bold text-zinc-900 dark:text-white mb-2">How does Local AI work without a GPU?</h4>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Veil Browser leverages WebGPU. If a dedicated GPU is unavailable, Transformers.js will automatically fall back to WebAssembly (WASM) CPU execution. While slower, your data will still remain 100% local and secure.
+                </p>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="lp-faq-card">
-              <div className="lp-faq-card__header">
-                <HelpCircle size={20} color="#0078D6" />
-                <h3>Why is Tor disabled by default?</h3>
-              </div>
-              <p>
-                Tor significantly reduces browsing speeds due to onion routing across global nodes. We leave Tor disabled by default for general browsing, allowing you to manually toggle it ON when you need absolute anonymity.
-              </p>
+        {/* Footer */}
+        <footer className="border-t border-zinc-200 dark:border-zinc-800 py-12 bg-white dark:bg-zinc-950">
+          <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-3">
+              <Image src="/logo.png" alt="Veil Logo" width={32} height={32} className="rounded-lg opacity-80" />
+              <span className="text-zinc-500 font-semibold tracking-tight">Veil Browser © {new Date().getFullYear()}</span>
             </div>
             
-            <div className="lp-faq-card">
-              <div className="lp-faq-card__header">
-                <HelpCircle size={20} color="#0078D6" />
-                <h3>How does Local AI work without a GPU?</h3>
-              </div>
-              <p>
-                Veil Browser leverages WebGPU. If a dedicated GPU is unavailable, Transformers.js will automatically fall back to WebAssembly (WASM) CPU execution. While slower, your data will still remain 100% local and secure.
-              </p>
+            <div className="flex items-center gap-6 text-sm font-medium text-zinc-500">
+              <Link href="/terms" className="hover:text-accent-primary transition-colors">Terms & Conditions</Link>
+              <Link href="/privacy" className="hover:text-accent-primary transition-colors">Privacy Policy</Link>
+              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noreferrer" className="hover:text-accent-primary transition-colors">GitHub</a>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="lp-cta">
-        <h2>Ready to disappear?</h2>
-        <p>Download Veil and take back control of your privacy.</p>
-        <button onClick={() => setShowModal(true)} className="lp-btn lp-btn--primary lp-btn--lg">
-          <Download size={20} /> Download Veil Browser
-        </button>
-      </section>
-
-      {/* Footer */}
-      <footer className="lp-footer">
-        <div className="lp-footer__container">
-          <div className="lp-footer__top">
-            <div className="lp-footer__col lp-footer__col--brand">
-              <div className="lp-logo">
-                <img src="/logo.png" alt="Veil" width={20} height={20} className="lp-logo__img" />
-                <span>Veil</span>
-              </div>
-              <p className="lp-footer__desc">
-                The next-generation browser engineered for absolute privacy. No telemetry, no trackers, just pure speed and security.
-              </p>
-            </div>
-
-            <div className="lp-footer__col">
-              <h4>Project Links</h4>
-              <a href="#features">Architecture</a>
-              <a href="#privacy">Privacy Deep Dive</a>
-              <a href="https://github.com/BGx-11/Veil" target="_blank" rel="noopener noreferrer">Source Code</a>
-              <a href="https://github.com/BGx-11/Veil/releases" target="_blank" rel="noopener noreferrer">Release Notes</a>
-            </div>
-
-            <div className="lp-footer__col">
-              <h4>Creator</h4>
-              <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">Devansh Agarwal</a>
-              <a href="https://github.com/BGx-11" target="_blank" rel="noopener noreferrer">GitHub Profile</a>
-            </div>
-          </div>
-          
-          <div className="lp-footer__bottom">
-            <div className="lp-footer__copy">
-              &copy; {new Date().getFullYear()} <a href="https://iambgx.in" target="_blank" rel="noopener noreferrer">BGx</a>. All rights reserved.
-            </div>
-            <div className="lp-footer__legal">
-              <a href="https://github.com/BGx-11/Veil/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">About License</a>
-              <a href="/terms">Terms of Service</a>
-              <a href="/privacy">Privacy Policy</a>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* Download Modal */}
-      {showModal && (
-        <div className="lp-modal-overlay" onClick={() => {
-          setShowModal(false);
-          setTimeout(() => setDownloadState('idle'), 300);
-        }}>
-          <div className="lp-modal" onClick={e => e.stopPropagation()}>
-            <button className="lp-modal-close" onClick={() => {
-              setShowModal(false);
-              setTimeout(() => setDownloadState('idle'), 300);
-            }}>
-              <X size={20} />
-            </button>
-            <div className="lp-modal-icon"><Download size={32} /></div>
-            <h3>Download Veil Browser</h3>
-            <p>Get the latest release directly from our open-source repository.</p>
-            
-            <div className="lp-modal-actions">
-              {downloadState === 'idle' && (
-                <button 
-                  onClick={() => {
-                    setDownloadState('downloading');
-                    setTimeout(() => {
-                      setDownloadState('completed');
-                      // Trigger actual download
-                      const link = document.createElement('a');
-                      link.href = 'https://github.com/BGx-11/Veil/releases/download/v1.1/Veil_1.1.0_x64_en-US.msi';
-                      link.download = 'Veil_1.1.0_x64_en-US.msi';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }, 1500);
-                  }}
-                  className="lp-btn lp-btn--primary"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  Download Setup .exe (Windows)
-                </button>
-              )}
-              {downloadState === 'downloading' && (
-                <button 
-                  className="lp-btn lp-btn--primary"
-                  style={{ width: '100%', justifyContent: 'center', opacity: 0.8, cursor: 'wait' }}
-                  disabled
-                >
-                  <div className="bounce" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Download size={18} /> Downloading...
-                  </div>
-                </button>
-              )}
-              {downloadState === 'completed' && (
-                <button 
-                  className="lp-btn lp-btn--primary"
-                  style={{ width: '100%', justifyContent: 'center', background: '#10b981', borderColor: '#10b981' }}
-                  disabled
-                >
-                  <CheckCircle2 size={18} /> Download Completed!
-                </button>
-              )}
-              <div className="lp-modal-note">
-                <Shield size={14} /> Open source and free forever.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        </footer>
+      </div>
     </div>
+  );
+}
+
+// Reusable Feature Card Component
+function FeatureCard({ icon, title, desc, color, textCol }: { icon: React.ReactNode, title: string, desc: string, color: string, textCol: string }) {
+  return (
+    <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} whileHover={{ y: -5 }} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
+      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-6 border border-zinc-100 dark:border-zinc-800`}>
+        <div className={textCol}>{icon}</div>
+      </div>
+      <h3 className="text-xl font-bold mb-3 text-zinc-900 dark:text-white">{title}</h3>
+      <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">{desc}</p>
+    </motion.div>
   );
 }

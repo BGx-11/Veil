@@ -40,14 +40,24 @@ export async function getSLMPipeline(progressCallback?: (data: any) => void) {
   
   if (!_generatorPromise) {
     const modelIdToLoad = getActiveModelId();
+    const progress_callback = (data: any) => {
+      for (const cb of _progressCallbacks) {
+        cb(data);
+      }
+    };
+    
     _generatorPromise = pipeline('text-generation', modelIdToLoad, {
       device: 'webgpu',
       dtype: 'q4f16',
-      progress_callback: (data: any) => {
-        for (const cb of _progressCallbacks) {
-          cb(data);
-        }
-      }
+      progress_callback
+    }).catch(async (err) => {
+      console.warn("WebGPU initialization failed, falling back to WASM:", err);
+      // Fallback to WebAssembly if WebGPU is not available
+      return pipeline('text-generation', modelIdToLoad, {
+        device: 'wasm',
+        dtype: 'q8',
+        progress_callback
+      });
     });
   }
   return _generatorPromise;
