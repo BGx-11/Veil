@@ -94,6 +94,14 @@ export default function LandingPage() {
             animate="visible"
             className="flex-1 flex flex-col items-center justify-center text-center max-w-5xl mx-auto px-4 pt-32 pb-20"
           >
+            <motion.div variants={itemVariants} className="inline-flex items-center px-4 py-2 rounded-full border border-zinc-200/50 dark:border-zinc-700/50 bg-white/20 dark:bg-black/20 backdrop-blur-xl mb-8 shadow-sm">
+              <span className="relative flex h-2.5 w-2.5 mr-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+              </span>
+              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">Veil 2.0 Desktop is now available</span>
+            </motion.div>
+            
             <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-extrabold tracking-tight text-zinc-900 dark:text-white max-w-4xl leading-[1.1] mb-6">
               Browse beyond <br />
               <span className="relative inline-block">

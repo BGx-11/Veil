@@ -6,7 +6,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-1.1-blueviolet?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.0-blueviolet?style=for-the-badge)
 
 **Official Site**: [veil.iambgx.in](https://veil.iambgx.in)
 
@@ -22,7 +22,7 @@ Veil is an ultra-lightweight, privacy-hardened desktop browser built entirely wi
 
 ---
 
-## 📋 Changelog — v1.1 (Pre-Release)
+## 📋 Changelog — v2.0 (Stable)
 
 ### 🆕 Features & Updates
 | Feature | Description |
