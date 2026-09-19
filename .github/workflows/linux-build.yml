@@ -17,7 +17,7 @@ jobs:
     - name: Install Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: 'npm'
 
     - name: Install Rust
@@ -40,6 +40,12 @@ jobs:
 
     - name: Build Next.js Output
       run: npm run build
+
+    - name: Ensure Tor resource bundle exists
+      run: |
+        if [ ! -f "src-tauri/tor.tar.gz" ]; then
+          tar -czf src-tauri/tor.tar.gz -T /dev/null
+        fi
 
     - name: Build Tauri App
       run: npm run tauri:build
