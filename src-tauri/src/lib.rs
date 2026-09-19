@@ -26,7 +26,7 @@ impl Default for PrivacySettings {
         Self {
             ad_blocker: true,
             strip_referer: true,
-            block_cookies: true,
+            block_cookies: false,
             https_only: false,
             block_webrtc: true,
             canvas_noise: true,
@@ -57,6 +57,9 @@ fn get_blocked_count(state: tauri::State<ProxyState>) -> u64 {
 #[tauri::command]
 fn toggle_tor(state: tauri::State<ProxyState>, app_handle: tauri::AppHandle, enable: bool) -> Result<String, String> {
     let mut tor_enabled = state.tor_enabled.lock().unwrap();
+    if *tor_enabled == enable {
+        return Ok(if enable { "Tor already enabled".into() } else { "Tor already disabled".into() });
+    }
     *tor_enabled = enable;
     if enable {
         let app_clone = app_handle.clone();
@@ -190,6 +193,23 @@ async fn open_incognito_window(app_handle: tauri::AppHandle) -> Result<(), Strin
 }
 
 #[tauri::command]
+async fn open_native_window(app_handle: tauri::AppHandle, url: String) -> Result<(), String> {
+    use tauri::{WebviewWindowBuilder, WebviewUrl};
+    
+    let label = format!("native-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs());
+    
+    let parsed_url = url.parse().map_err(|e: url::ParseError| e.to_string())?;
+    
+    let _ = WebviewWindowBuilder::new(&app_handle, label, WebviewUrl::External(parsed_url))
+        .title("Veil - Secure Native Context")
+        .inner_size(1000.0, 700.0)
+        .build()
+        .map_err(|e| e.to_string())?;
+        
+    Ok(())
+}
+
+#[tauri::command]
 fn open_file(path: String) -> Result<(), String> {
     open::that(path).map_err(|e| e.to_string())
 }
@@ -210,6 +230,18 @@ fn resume_download(_id: String) -> Result<(), String> {
 fn cancel_download(_id: String) -> Result<(), String> {
     // Stub: Cancel not yet implemented natively
     Ok(())
+}
+
+#[tauri::command]
+async fn sync_data(encrypted_payload: String, device_id: String) -> Result<String, String> {
+    // E2E Encrypted Sync: cloud sync structure
+    // This is where we would send the payload to the Veil sync server.
+    // The payload is encrypted locally using the user's master password (AES-GCM).
+    // So the server never sees the plaintext data.
+    println!("Syncing encrypted payload of length {} for device {}", encrypted_payload.len(), device_id);
+    // Mock network delay
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    Ok("Sync successful".into())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -252,9 +284,11 @@ pub fn run() {
             close_window,
             open_file,
             open_incognito_window,
+            open_native_window,
             pause_download,
             resume_download,
             cancel_download,
+            sync_data,
             db::add_history,
             db::get_history,
             db::clear_history

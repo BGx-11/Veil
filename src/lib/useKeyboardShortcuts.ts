@@ -180,8 +180,8 @@ export function useKeyboardShortcuts(
 
       // ── Tab Search ──
       
-      // Ctrl+Shift+A — Tab Search
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+      // Ctrl+Shift+A or Ctrl+K — Command Palette / Tab Search
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || (e.shiftKey && (e.key === 'a' || e.key === 'A')))) {
         e.preventDefault();
         setTabSearchOpen(true);
       }

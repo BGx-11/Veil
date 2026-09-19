@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Diamond, MessageCircle, Phone, Heart, Clock, MoreHorizontal, User, FileText, LayoutGrid, Globe, Plus, X, Volume2, VolumeX, Video, Mic, Settings, Briefcase, Bookmark, ChevronDown, Check, Layers, Code } from 'lucide-react';
+import { Sparkles, Diamond, MessageCircle, Phone, Heart, Clock, MoreHorizontal, User, FileText, LayoutGrid, Globe, Plus, X, Volume2, VolumeX, Video, Mic, Settings, Briefcase, Bookmark, ChevronDown, Check, Layers, Code, Ghost, Trash2 } from 'lucide-react';
 import { useBrowserStore, type Tab } from '@/lib/store';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 const iconMap: Record<string, any> = {
-  Sparkles, Diamond, MessageCircle, Phone, Heart, Clock, MoreHorizontal, User, FileText, LayoutGrid, Globe, Settings, Briefcase, Bookmark, Code
+  Sparkles, Diamond, MessageCircle, Phone, Heart, Clock, MoreHorizontal, User, FileText, LayoutGrid, Globe, Settings, Briefcase, Bookmark, Code, Ghost
 };
 
 export default function Sidebar() {
   const {
     tabs, activeId, setActiveId, addTab, closeTab, setTabs, splitTabId,
-    settings, activeWorkspaceId, workspaces, setActiveWorkspaceId
+    settings, activeWorkspaceId, workspaces, setActiveWorkspaceId,
+    addWorkspace, removeWorkspace
   } = useBrowserStore();
 
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
@@ -142,24 +143,60 @@ export default function Sidebar() {
                   const Icon = iconMap[ws.icon] || User;
                   const isCurrent = ws.id === activeWorkspaceId;
                   return (
-                    <button
+                    <div
                       key={ws.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         setActiveWorkspaceId(ws.id);
                         setWorkspaceMenuOpen(false);
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left group
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left group cursor-pointer
                         ${isCurrent ? 'bg-[var(--surface-icon-bg)] shadow-sm' : 'hover:bg-[var(--surface-icon-hover)]'}`}
                       style={{ color: isCurrent ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                     >
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110">
                         <Icon size={16} />
                       </div>
-                      <span className="flex-1">{ws.name}</span>
+                      <span className="flex-1 text-left">{ws.name} {ws.ephemeral && <span className="text-[10px] uppercase text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded ml-1">Temp</span>}</span>
                       {isCurrent && <Check size={16} className="text-[var(--accent-primary)]" />}
-                    </button>
+                      {ws.ephemeral && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeWorkspace(ws.id);
+                            setWorkspaceMenuOpen(false);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-all ml-1"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
+
+                <div className="h-px bg-[var(--border-color)] my-1" />
+                <button
+                  onClick={() => {
+                    const id = `ephemeral_${Math.random().toString(36).slice(2, 9)}`;
+                    addWorkspace({
+                      id,
+                      name: `Incognito ${workspaces.filter(w => w.ephemeral).length + 1}`,
+                      icon: 'Ghost',
+                      ephemeral: true,
+                      color: 'purple-500'
+                    });
+                    setActiveWorkspaceId(id);
+                    setWorkspaceMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-purple-500/10 text-purple-400 group"
+                >
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 bg-purple-500/20">
+                    <Plus size={16} />
+                  </div>
+                  <span className="flex-1 text-left">New Disposable</span>
+                </button>
               </motion.div>
             </>
           )}
@@ -167,7 +204,8 @@ export default function Sidebar() {
       </div>
 
       {/* Tabs List */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 scrollbar-hide">
+      {settings.useVerticalTabs && (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 scrollbar-hide">
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="vertical-tabs-list" direction="vertical">
             {(provided) => (
@@ -255,6 +293,7 @@ export default function Sidebar() {
           </Droppable>
         </DragDropContext>
       </div>
+      )}
 
       <div className="px-3 pb-4 pt-1 flex justify-center">
         <button 

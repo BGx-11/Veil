@@ -506,7 +506,7 @@ export default function Toolbar({
         {/* Tab Search */}
         <ToolbarButton
           onClick={() => useBrowserStore.getState().setTabSearchOpen(true)}
-          title="Search Tabs (Ctrl+Shift+A)"
+          title="Command Palette (Ctrl+K)"
         >
           <Layers size={14} />
         </ToolbarButton>

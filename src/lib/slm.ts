@@ -8,15 +8,16 @@ env.useBrowserCache = true; // IMPORTANT: Must be true so models are downloaded/
 env.backends.onnx.wasm.wasmPaths = '/wasm/';
 
 export const RECOMMENDED_MODELS = [
-  { id: 'onnx-community/Qwen2.5-0.5B-Instruct', name: 'Qwen 2.5 (0.5B)', desc: 'Extremely smart and capable for its size. Best overall.', size: '~350MB' },
-  { id: 'onnx-community/Llama-3.2-1B-Instruct', name: 'Llama 3.2 (1B)', desc: 'State of the art reasoning, but requires more RAM and takes longer to load.', size: '~800MB' },
-  { id: 'Xenova/Qwen1.5-0.5B-Chat', name: 'Qwen 1.5 (0.5B)', desc: 'Fast, balanced legacy model for general chat.', size: '~300MB' },
-  { id: 'Felladrin/onnx-Llama-160M-Chat-v1', name: 'Llama 160M', desc: 'Ultra-lightweight, extremely fast but less capable.', size: '~100MB' },
+  { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 (0.5B)', desc: 'Extremely smart and capable for its size. Best overall.', size: '~400MB' },
+  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2 (1B)', desc: 'State of the art reasoning, but requires more RAM and takes longer to load.', size: '~800MB' },
+  { id: 'Phi-3.5-mini-instruct-q4f16_1-MLC', name: 'Phi 3.5 Mini', desc: 'Powerful Microsoft model, balanced speed and quality.', size: '~2GB' },
+  { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5 (1.5B)', desc: 'Very capable intermediate model.', size: '~1GB' },
 ];
 
-let _generatorPromise: Promise<any> | null = null;
+let _enginePromise: Promise<any> | null = null;
+let _translatorPromise: Promise<any> | null = null;
 let _progressCallbacks: Set<(data: any) => void> = new Set();
-let _activeModelId: string = 'onnx-community/Qwen2.5-0.5B-Instruct';
+let _activeModelId: string = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
 
 export function getActiveModelId() {
   if (typeof window !== 'undefined') {
@@ -30,7 +31,7 @@ export function setActiveModelId(modelId: string) {
   if (typeof window !== 'undefined') {
     localStorage.setItem('veil_active_slm', modelId);
   }
-  _generatorPromise = null; // force re-init next time
+  _enginePromise = null; // force re-init next time
 }
 
 export async function getSLMPipeline(progressCallback?: (data: any) => void) {
@@ -38,31 +39,55 @@ export async function getSLMPipeline(progressCallback?: (data: any) => void) {
     _progressCallbacks.add(progressCallback);
   }
   
-  if (!_generatorPromise) {
+  if (!_enginePromise) {
+    const { CreateMLCEngine } = await import('@mlc-ai/web-llm');
     const modelIdToLoad = getActiveModelId();
+    
+    const initProgressCallback = (report: any) => {
+      const percentage = report.progress; // 0 to 1
+      for (const cb of _progressCallbacks) {
+        if (percentage >= 1) {
+          cb({ status: 'ready' });
+        } else {
+          cb({ status: 'downloading', loaded: percentage * 100, total: 100 });
+        }
+      }
+    };
+    
+    _enginePromise = CreateMLCEngine(modelIdToLoad, {
+      initProgressCallback
+    }).catch(async (err) => {
+      console.warn("WebLLM initialization failed:", err);
+      _enginePromise = null;
+      throw err;
+    });
+  }
+  return _enginePromise;
+}
+
+export function removeSLMProgressCallback(cb: (data: any) => void) {
+  _progressCallbacks.delete(cb);
+}
+
+export async function getTranslatorPipeline(progressCallback?: (data: any) => void) {
+  if (progressCallback) {
+    _progressCallbacks.add(progressCallback);
+  }
+  
+  if (!_translatorPromise) {
     const progress_callback = (data: any) => {
       for (const cb of _progressCallbacks) {
         cb(data);
       }
     };
     
-    _generatorPromise = pipeline('text-generation', modelIdToLoad, {
-      device: 'webgpu',
-      dtype: 'q4f16',
+    _translatorPromise = pipeline('translation', 'Xenova/nllb-200-distilled-600M', {
+      dtype: 'q8',
       progress_callback
     }).catch(async (err) => {
-      console.warn("WebGPU initialization failed, falling back to WASM:", err);
-      // Fallback to WebAssembly if WebGPU is not available
-      return pipeline('text-generation', modelIdToLoad, {
-        device: 'wasm',
-        dtype: 'q8',
-        progress_callback
-      });
+      console.warn("Translator initialization failed:", err);
+      throw err;
     });
   }
-  return _generatorPromise;
-}
-
-export function removeSLMProgressCallback(cb: (data: any) => void) {
-  _progressCallbacks.delete(cb);
+  return _translatorPromise;
 }

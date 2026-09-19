@@ -185,6 +185,13 @@ export default function Settings({ settings, onToggle }: SettingsProps) {
                 </div>
                 <Toggle on={!!settings.darkMode} loading={loadingKey === 'darkMode'} onClick={() => handleToggle('darkMode')} />
               </div>
+              <div className="flex items-center justify-between p-5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface-icon-bg)] shadow-sm mt-4">
+                <div className="pr-4">
+                  <div className="font-semibold text-[var(--text-primary)] text-base">Vertical Tabs</div>
+                  <div className="text-sm text-[var(--text-secondary)] mt-1">Show tabs in the sidebar instead of the top bar.</div>
+                </div>
+                <Toggle on={!!settings.useVerticalTabs} loading={loadingKey === 'useVerticalTabs'} onClick={() => handleToggle('useVerticalTabs')} />
+              </div>
             </div>
 
             {/* Search Engine */}

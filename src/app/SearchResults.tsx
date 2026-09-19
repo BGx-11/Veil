@@ -495,20 +495,34 @@ export default function SearchResults({ query, onNavigate }: { query: string; on
                   setSlmProgress('Summarizing results...');
                 }
               };
-              const generator = await getSLMPipeline(progressCb);
+              const engine = await getSLMPipeline(progressCb);
               const contextText = deduped.slice(0, 3).map((r) => r.title + ': ' + r.description).join('\n');
               const messagesArray = [
                 { role: 'system', content: 'You are Veil AI, a highly intelligent browser assistant. Your task is to read the provided search results and synthesize a precise, exceptionally well-reasoned, and accurate summary paragraph that directly answers the user\'s query. Ensure it is factually correct and concise.' },
                 { role: 'user', content: `Query: ${cleanQuery}\n\nResults:\n${contextText}` }
               ];
-              const output = await generator(messagesArray, { max_new_tokens: 100, temperature: 0.1, repetition_penalty: 1.18, do_sample: true, top_p: 0.9 });
-              let text = output[0].generated_text;
-              if (Array.isArray(text)) text = text[text.length - 1].content;
-              else if (typeof text === 'string' && text.includes('<|assistant|>\n')) text = text.split('<|assistant|>\n').pop()?.trim() || text;
+              
+              const chunks = await engine.chat.completions.create({
+                messages: messagesArray,
+                temperature: 0.1,
+                top_p: 0.9,
+                stream: true,
+              });
+
+              let fullText = "";
+              for await (const chunk of chunks) {
+                if (!alive) {
+                  engine.interruptGenerate();
+                  break;
+                }
+                const text = chunk.choices[0]?.delta?.content || "";
+                fullText += text;
+                setSlmSummary(fullText);
+              }
+              
               if (alive) {
-                setSlmSummary(text);
                 const cc = searchCache.get(cacheKey);
-                if (cc) cc.slmSummary = text;
+                if (cc) cc.slmSummary = fullText;
               }
             } catch (e: any) {
               if (alive) { setSlmProgress(`AI Error: ${e.message}`); setSlmGenerating(false); }

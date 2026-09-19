@@ -29,6 +29,7 @@ export interface Workspace {
   name: string;
   icon: string;
   color?: string;
+  ephemeral?: boolean;
 }
 
 export interface TabGroup {
@@ -98,7 +99,8 @@ export interface BrowserSettings {
   darkMode: boolean;
   normalMode: boolean;
   slmConsent?: boolean;
-  bookmarks: {url: string, title: string}[];
+  torWarningDismissed?: boolean;
+  bookmarks: {url: string, title: string, category?: string}[];
   blocklist: string[];
   searchEngine: 'duckduckgo' | 'google' | 'bing' | 'brave' | 'yahoo';
   sidebarApps: ShortcutItem[];
@@ -107,6 +109,7 @@ export interface BrowserSettings {
   passwords: PasswordEntry[];
   defaultZoom: number; // default zoom percentage for new tabs
   hasCompletedSetup?: boolean;
+  useVerticalTabs?: boolean;
 }
 
 export const NEWTAB = 'veil://newtab';
@@ -179,6 +182,8 @@ interface BrowserStore {
   setFullscreen: (fs: boolean) => void;
   setWorkspaces: (workspaces: Workspace[]) => void;
   setActiveWorkspaceId: (id: string) => void;
+  addWorkspace: (workspace: Workspace) => void;
+  removeWorkspace: (id: string) => void;
   setActiveWebPanelUrl: (url: string | null) => void;
   updateSettings: (updates: Partial<BrowserSettings>) => void;
   addToast: (message: string, type?: 'success' | 'info' | 'warning') => void;
@@ -228,11 +233,13 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
     darkMode: false,
     normalMode: false,
     slmConsent: false,
+    torWarningDismissed: false,
     bookmarks: [],
     blocklist: [],
     searchEngine: 'yahoo',
     defaultZoom: 100,
     hasCompletedSetup: false,
+    useVerticalTabs: true,
     sidebarApps: [
       { id: '1', name: 'Veil AI', url: 'veil://slm', icon: 'Sparkles', color: 'orange-400' },
       { id: '2', name: 'Passwords', url: 'veil://passwords', icon: 'Key', color: 'indigo-500' },
@@ -334,6 +341,12 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
   setFullscreen: (fs) => set({ fullscreen: fs }),
   setWorkspaces: (ws) => set({ workspaces: ws }),
   setActiveWorkspaceId: (id) => set({ activeWorkspaceId: id }),
+  addWorkspace: (ws) => set((state) => ({ workspaces: [...state.workspaces, ws] })),
+  removeWorkspace: (id) => set((state) => ({
+    workspaces: state.workspaces.filter(w => w.id !== id),
+    tabs: state.tabs.filter(t => t.workspaceId !== id), // Also close all tabs in this workspace
+    activeWorkspaceId: state.activeWorkspaceId === id ? 'default' : state.activeWorkspaceId
+  })),
   setActiveWebPanelUrl: (url) => set({ activeWebPanelUrl: url }),
   
   updateSettings: (updates) => set((state) => {
@@ -362,7 +375,8 @@ export const useBrowserStore = create<BrowserStore>((set, get) => ({
   },
 
   addHistoryEntry: (entry) => {
-    if (!get().isIncognito) {
+    const currentWorkspace = get().workspaces.find(w => w.id === get().activeWorkspaceId);
+    if (!get().isIncognito && !currentWorkspace?.ephemeral) {
       invoke('add_history', { url: entry.url, title: entry.title, favicon: null }).catch(console.error);
     }
   },

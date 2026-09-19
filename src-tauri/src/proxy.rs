@@ -50,6 +50,7 @@ pub struct ProxyContext {
     pub blocklist: Arc<Engine>,
     pub app_handle: AppHandle,
     pub referer_map: Arc<Mutex<std::collections::HashMap<String, (String, bool)>>>,
+    #[allow(dead_code)]
     pub incognito_jar: std::sync::Arc<reqwest::cookie::Jar>,
     pub client_normal: Client,
     pub client_incognito: Client,
@@ -226,6 +227,20 @@ const CANVAS_NOISE_SCRIPT: &str = r#"<script>
     if(p===37446)return'Veil Graphics';
     return getParam.apply(this,arguments);
   };
+  // AudioContext fingerprint protection
+  const audioCtx=window.AudioContext||window.webkitAudioContext;
+  if(audioCtx){
+    const origCreateOscillator=audioCtx.prototype.createOscillator;
+    audioCtx.prototype.createOscillator=function(){
+      const osc=origCreateOscillator.apply(this,arguments);
+      const origStart=osc.start;
+      osc.start=function(){
+        osc.frequency.value+=(Math.random()*0.0001);
+        return origStart.apply(this,arguments);
+      };
+      return osc;
+    };
+  }
 })();
 </script>"#;
 
@@ -239,10 +254,27 @@ pub async fn start_proxy(
     let referer_map = Arc::new(Mutex::new(std::collections::HashMap::new()));
     let incognito_jar = std::sync::Arc::new(reqwest::cookie::Jar::default());
     
-    let client_normal = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).build().unwrap();
-    let client_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).build().unwrap();
-    let client_tor = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).build().unwrap_or_else(|_| client_normal.clone());
-    let client_tor_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).build().unwrap_or_else(|_| client_incognito.clone());
+    let default_headers = {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::ACCEPT, "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8".parse().unwrap());
+        headers.insert(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.5".parse().unwrap());
+        headers.insert(reqwest::header::UPGRADE_INSECURE_REQUESTS, "1".parse().unwrap());
+        headers.insert("Sec-Fetch-Dest", "document".parse().unwrap());
+        headers.insert("Sec-Fetch-Mode", "navigate".parse().unwrap());
+        headers.insert("Sec-Fetch-Site", "none".parse().unwrap());
+        headers.insert("Sec-Fetch-User", "?1".parse().unwrap());
+        headers.insert("Sec-Ch-Ua", "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Google Chrome\";v=\"122\"".parse().unwrap());
+        headers.insert("Sec-Ch-Ua-Mobile", "?0".parse().unwrap());
+        headers.insert("Sec-Ch-Ua-Platform", "\"Windows\"".parse().unwrap());
+        headers
+    };
+
+    let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+    let client_normal = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).default_headers(default_headers.clone()).user_agent(user_agent).build().unwrap();
+    let client_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).default_headers(default_headers.clone()).user_agent(user_agent).build().unwrap();
+    let client_tor = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).default_headers(default_headers.clone()).user_agent(user_agent).build().unwrap_or_else(|_| client_normal.clone());
+    let client_tor_incognito = Client::builder().redirect(reqwest::redirect::Policy::limited(10)).cookie_provider(incognito_jar.clone()).proxy(reqwest::Proxy::all("socks5h://127.0.0.1:9050").unwrap()).default_headers(default_headers.clone()).user_agent(user_agent).build().unwrap_or_else(|_| client_incognito.clone());
 
     let ctx = ProxyContext { tor_state, privacy, blocked_count, blocklist, app_handle, referer_map, incognito_jar, client_normal, client_incognito, client_tor, client_tor_incognito };
 
@@ -380,8 +412,9 @@ async fn handle_proxy(
         request = request.header("Referer", "");
     }
     
-    // Block cookies
-    if (!is_normal && settings.block_cookies) || is_incognito {
+    // Block cookies manually only if strict blocking is enabled in normal mode.
+    // Incognito mode handles cookies via its isolated incognito_jar.
+    if !is_normal && settings.block_cookies {
         request = request.header("Cookie", "");
     }
 
@@ -427,12 +460,12 @@ async fn handle_proxy(
                 if key_str.starts_with("access-control-allow-") {
                     continue;
                 }
-                // Strip security headers that prevent iframe loading or script injection
-                if key_str == "content-security-policy" || key_str == "content-security-policy-report-only" || key_str == "x-frame-options" {
+                // Strip security headers that prevent iframe loading, script injection, or referer tracking needed by fallback
+                if key_str == "content-security-policy" || key_str == "content-security-policy-report-only" || key_str == "x-frame-options" || key_str == "referrer-policy" {
                     continue;
                 }
-                // Block Set-Cookie in privacy mode or incognito
-                if ((!is_normal && settings.block_cookies) || is_incognito) && key_str == "set-cookie" {
+                // Block Set-Cookie only if strict blocking is enabled in normal mode
+                if (!is_normal && settings.block_cookies) && key_str == "set-cookie" {
                     continue;
                 }
                 builder = builder.header(key.as_str(), val.as_bytes());
@@ -475,6 +508,29 @@ async fn handle_proxy(
                           window.parent.postMessage({{ type: 'navigate', url: url.toString() }}, '*');
                       }} catch(err) {{}}
                     }}
+                  }}, true);
+                  document.addEventListener('visibilitychange', function() {{
+                    if (document.hidden) {{
+                      let v = document.querySelector('video');
+                      if (v && !v.paused && !document.pictureInPictureElement) {{
+                        try {{ v.requestPictureInPicture().catch(()=>{{}}); }} catch(e) {{}}
+                      }}
+                    }}
+                  }});
+                  let hoverTimer = null;
+                  document.addEventListener('mouseover', function(e) {{
+                    let a = e.target.closest('a');
+                    if (a && a.getAttribute('href') && !a.getAttribute('href').startsWith('javascript:')) {{
+                      hoverTimer = setTimeout(() => {{
+                        try {{
+                            let target = new URL(a.getAttribute('href'), ORIGINAL_URL).href;
+                            window.parent.postMessage({{ type: 'prefetch', url: target }}, '*');
+                        }} catch(err) {{}}
+                      }}, 300);
+                    }}
+                  }}, true);
+                  document.addEventListener('mouseout', function(e) {{
+                    if (hoverTimer) clearTimeout(hoverTimer);
                   }}, true);
                   window.history.pushState = function() {{}};
                   window.history.replaceState = function() {{}};
@@ -523,7 +579,25 @@ async fn handle_proxy(
                     }
                 }
                 
-                let injected = format!("{}{}{}", style_tag, script_tag, privacy_scripts);
+                let is_captcha = (status.as_u16() == 403 || status.as_u16() == 429) && 
+                    (text.contains("cf-turnstile") || text.contains("cf-browser-verification") || text.contains("hcaptcha") || text.contains("recaptcha") || text.contains("Cloudflare"));
+                
+                let mut captcha_overlay = String::new();
+                if is_captcha {
+                    captcha_overlay = format!(r#"
+                    <div style="position:fixed;top:0;left:0;right:0;background:#ef4444;color:white;padding:12px 24px;z-index:2147483647;font-family:system-ui;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                            <div>
+                                <div style="font-weight:600;font-size:14px;">CAPTCHA Detected</div>
+                                <div style="font-size:12px;opacity:0.9;">Veil's proxy prevents this verification from loading.</div>
+                            </div>
+                        </div>
+                        <button onclick="window.parent.postMessage({{ type: 'captcha-detected', url: '{}' }}, '*')" style="background:white;color:#ef4444;border:none;padding:8px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;transition:opacity 0.2s;">Solve securely</button>
+                    </div>"#, final_url);
+                }
+
+                let injected = format!("{}{}{}{}", captcha_overlay, style_tag, script_tag, privacy_scripts);
 
                 let lower_text = text.to_lowercase();
                 if let Some(idx) = lower_text.find("<head") {

@@ -51,6 +51,14 @@ export default function TabWorkspace({ nav, wvRefs }: any) {
         updateTab(sourceTabId, { title: e.data.title });
       } else if (e.data.type === 'favicon' && e.data.url) {
         updateTab(sourceTabId, { favicon: e.data.url });
+      } else if (e.data.type === 'prefetch' && e.data.url) {
+        // Speculative Prerendering: Hit the proxy to warm up the OS/browser cache
+        fetch(`http://127.0.0.1:8181/proxy?url=${encodeURIComponent(e.data.url)}`, { mode: 'no-cors' }).catch(() => {});
+      } else if (e.data.type === 'captcha-detected' && e.data.url) {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+          invoke('open_native_window', { url: e.data.url }).catch(console.error);
+        }).catch(() => {});
+        useBrowserStore.getState().addToast('Opening native window to solve CAPTCHA securely', 'info');
       } else if (e.data.type === 'screenshot-result' && e.data.dataUrl) {
         // Flash screen effect
         const flash = document.createElement('div');

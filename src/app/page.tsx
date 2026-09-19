@@ -65,7 +65,7 @@ export default function LandingPage() {
             className="w-full flex items-center justify-between p-6 md:px-12 max-w-7xl mx-auto absolute top-0 left-0 right-0 z-50"
           >
             <div className="flex items-center gap-3 group cursor-pointer">
-              <Image src="/logo.png" alt="Veil Logo" width={40} height={40} className="group-hover:scale-105 transition-transform duration-300 drop-shadow-md rounded-xl" />
+              <Image src="/logo.png" alt="Veil Logo" width={40} height={40} priority className="group-hover:scale-105 transition-transform duration-300 drop-shadow-md rounded-xl" />
               <span className="text-2xl font-bold tracking-tight dark:text-white text-zinc-900">
                 Veil
               </span>

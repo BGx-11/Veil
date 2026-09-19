@@ -33,6 +33,8 @@ export default function BrowserShell() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [slmContext, setSlmContext] = useState('');
   const [torError, setTorError] = useState('');
+  const [showTorWarning, setShowTorWarning] = useState(false);
+  const [dontShowTorWarningAgain, setDontShowTorWarningAgain] = useState(false);
 
   const urlInputRef = useRef<HTMLInputElement>(null);
   const wvRefs = useRef<Record<string, HTMLIFrameElement>>({});
@@ -78,7 +80,12 @@ export default function BrowserShell() {
         setTabs(p => p.map(t => t.id === activeId ? { ...t } : t));
       } else {
         const wv = wvRefs.current[activeId];
-        if (wv) wv.src = wv.src;
+        if (wv) {
+          useBrowserStore.getState().updateTab(activeId, { loading: true, loadProgress: 10 });
+          const currentSrc = wv.src;
+          wv.src = 'about:blank';
+          setTimeout(() => { if (wv) wv.src = currentSrc; }, 10);
+        }
       }
     }
   };
@@ -105,6 +112,10 @@ export default function BrowserShell() {
           parsed.darkMode = true;
         }
         updateSettings(parsed);
+        
+        if (parsed.torMode) {
+          safeInvoke('toggle_tor', { enable: true }).catch(console.error);
+        }
       }
     } catch (e) {}
 
@@ -167,6 +178,16 @@ export default function BrowserShell() {
   }, [settings, mounted, isIncognito]);
 
   useEffect(() => {
+    if (mounted && settings.torMode) {
+      safeInvoke('toggle_tor', { enable: true }).then((res: any) => {
+        if (res === 'Tor already enabled') {
+           useBrowserStore.getState().updateSettings({ torStatus: 'connected' });
+        }
+      });
+    }
+  }, [mounted]); // Only run once when mounted
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.darkMode ? 'dark' : 'light');
   }, [settings.darkMode]);
 
@@ -218,22 +239,30 @@ export default function BrowserShell() {
     }
   }, [slmOpen, activeId, tabs]);
 
+  const executeTorToggle = async (newVal: boolean) => {
+    updateSettings({ torStatus: newVal ? 'connecting' : 'disconnected' });
+    const res: any = await safeInvoke('toggle_tor', { enable: newVal });
+    if (res && typeof res === 'string') {
+      updateSettings({ torMode: newVal });
+      if (!newVal) {
+        updateSettings({ torStatus: 'disconnected' });
+        addToast('Tor Network disconnected', 'info');
+      } else {
+        addToast('Connecting to Tor Network...', 'info');
+      }
+    } else {
+      updateSettings({ torMode: false, torStatus: 'disconnected' });
+      setTorError(typeof res === 'object' && res?.error ? res.error : 'Unknown Tor Error');
+    }
+  };
+
   const toggleSetting = async (key: string, value?: any) => {
     const newVal = value !== undefined ? value : !(settings as any)[key];
     if (key === 'torMode') {
-      updateSettings({ torStatus: newVal ? 'connecting' : 'disconnected' });
-      const res: any = await safeInvoke('toggle_tor', { enable: newVal });
-      if (res && typeof res === 'string') {
-        updateSettings({ torMode: newVal });
-        if (!newVal) {
-          updateSettings({ torStatus: 'disconnected' });
-          addToast('Tor Network disconnected', 'info');
-        } else {
-          addToast('Connecting to Tor Network...', 'info');
-        }
+      if (newVal && !settings.torWarningDismissed) {
+        setShowTorWarning(true);
       } else {
-        updateSettings({ torMode: false, torStatus: 'disconnected' });
-        setTorError(typeof res === 'object' && res?.error ? res.error : 'Unknown Tor Error');
+        await executeTorToggle(newVal);
       }
     } else {
       updateSettings({ [key]: newVal });
@@ -272,6 +301,60 @@ export default function BrowserShell() {
         
         {!settings.hasCompletedSetup && <Onboarding />}
 
+        <AnimatePresence>
+          {showTorWarning && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                className="bg-[var(--surface-bg)] border border-[var(--border-color)] rounded-2xl p-6 shadow-2xl max-w-md w-full relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-full h-1 bg-orange-500" />
+                <h3 className="text-xl font-semibold mb-2 flex items-center gap-2 text-orange-400">
+                  <Shield size={24} /> Tor Network Notice
+                </h3>
+                <p className="text-[var(--text-secondary)] text-sm mb-6 leading-relaxed">
+                  Enabling the Tor Network routes your traffic through multiple encrypted relays for maximum anonymity. 
+                  <br/><br/>
+                  <strong>Note:</strong> Browsing speeds will be significantly slower, and some websites may block you or require CAPTCHAs.
+                </p>
+                
+                <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6 cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={dontShowTorWarningAgain}
+                    onChange={(e) => setDontShowTorWarningAgain(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-600 bg-gray-700/50 accent-orange-500"
+                  />
+                  Don't show this again
+                </label>
+
+                <div className="flex gap-3 justify-end">
+                  <button 
+                    onClick={() => setShowTorWarning(false)}
+                    className="px-4 py-2 rounded-xl font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-icon-bg)] hover:text-[var(--text-primary)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowTorWarning(false);
+                      if (dontShowTorWarningAgain) {
+                        updateSettings({ torWarningDismissed: true });
+                      }
+                      executeTorToggle(true);
+                    }}
+                    className="px-4 py-2 rounded-xl font-medium bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/20 transition-all"
+                  >
+                    Enable Tor
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         <Toaster 
           position="bottom-right" 
           theme="dark" // We are using a dark Zen theme globally now
@@ -288,6 +371,7 @@ export default function BrowserShell() {
 
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative glass-panel ml-1 mr-2 mb-2">
+            {!settings.useVerticalTabs && <TabBar />}
             <Toolbar
               urlInputRef={urlInputRef}
               urlInput={urlInput}

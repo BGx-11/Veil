@@ -15,6 +15,7 @@
     "@base-ui/react": "^1.6.0",
     "@chenglou/pretext": "^0.0.8",
     "@hello-pangea/dnd": "^18.0.1",
+    "@mlc-ai/web-llm": "^0.2.84",
     "@tauri-apps/plugin-os": "^2.3.2",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",

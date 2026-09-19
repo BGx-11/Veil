@@ -4,7 +4,7 @@ import { Bot, Send, Sparkles, X, Loader2, Trash, Settings, Download, ChevronDown
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
-import { getSLMPipeline, removeSLMProgressCallback, RECOMMENDED_MODELS, getActiveModelId, setActiveModelId } from '@/lib/slm';
+import { getSLMPipeline, getTranslatorPipeline, removeSLMProgressCallback, RECOMMENDED_MODELS, getActiveModelId, setActiveModelId } from '@/lib/slm';
 import { useBrowserStore } from '@/lib/store';
 
 interface Message { role: 'user' | 'assistant' | 'system'; content: string; }
@@ -76,33 +76,99 @@ export default function SLMPanel({ isOpen, onClose, currentContext }: { isOpen: 
           ...messages.filter(m => m.role !== 'system'),
           { role: 'user', content: currentContext ? `Context from page:\n${currentContext}\n\n${userMsg}` : userMsg }
         ];
-        const callback = () => { if (newAbortController.signal.aborted) throw new Error("Generation aborted by user"); };
-        const result = await generatorRef.current(messagesArray, { max_new_tokens: 250, temperature: 0.3, top_p: 0.95, repetition_penalty: 1.15, do_sample: true, callback_function: callback });
-        if (newAbortController.signal.aborted) return;
-        let finalResp = result[0].generated_text;
-        if (Array.isArray(finalResp)) finalResp = finalResp[finalResp.length - 1].content;
-        else if (typeof finalResp === 'string') {
-          if (finalResp.includes('<|assistant|>\n')) finalResp = finalResp.split('<|assistant|>\n').pop()?.trim() || finalResp;
-          if (finalResp.length > 800) finalResp = finalResp.substring(0, 800) + '...';
+        
+        const chunks = await generatorRef.current.chat.completions.create({
+          messages: messagesArray,
+          temperature: 0.3,
+          top_p: 0.95,
+          stream: true,
+        });
+
+        let fullResponse = "";
+        setMessages(prev => [...prev, { role: 'assistant', content: "" }]);
+        
+        for await (const chunk of chunks) {
+          if (newAbortController.signal.aborted) {
+            generatorRef.current.interruptGenerate();
+            break;
+          }
+          const text = chunk.choices[0]?.delta?.content || "";
+          fullResponse += text;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            newMessages[newMessages.length - 1].content = fullResponse;
+            return newMessages;
+          });
         }
-        setMessages(prev => [...prev, { role: 'assistant', content: finalResp }]);
       } else {
         setTimeout(() => {
           if (!newAbortController.signal.aborted) setMessages(prev => [...prev, { role: 'assistant', content: "Offline mode: " + userMsg }]);
         }, 1000);
       }
     } catch (err: any) {
-      if (err.message !== "Generation aborted by user") setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error.' }]);
+      if (err.message !== "Generation aborted by user" && !newAbortController.signal.aborted) setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error.' }]);
       else setMessages(prev => [...prev, { role: 'assistant', content: '*(Generation Stopped)*' }]);
     } finally {
       setIsTyping(false); setAbortController(null);
     }
   };
 
-  const handleStop = () => abortController?.abort();
-  const translatePage = (lang: string = "English") => {
+  const handleStop = () => {
+    abortController?.abort();
+    generatorRef.current?.interruptGenerate();
+  };
+  const translatePage = async (lang: string = "English") => {
     setTranslateOpen(false);
-    handleSend(undefined, `Please translate the content of this page to ${lang}.`);
+    if (!currentContext) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'No page context available to translate.' }]);
+      return;
+    }
+    
+    setInput(''); setIsTyping(true);
+    setMessages(prev => [...prev, { role: 'user', content: `Translate this page to ${lang}.` }]);
+    setLoadingText('Loading Translator Model...');
+    setModelReady(false);
+    
+    try {
+      // Map common lang names to NLLB codes (simplified for example)
+      const langMap: Record<string, string> = {
+        'English': 'eng_Latn',
+        'Spanish': 'spa_Latn',
+        'French': 'fra_Latn',
+        'German': 'deu_Latn',
+        'Hindi': 'hin_Deva',
+        'Japanese': 'jpn_Jpan',
+        'Chinese': 'zho_Hans',
+      };
+      const targetLang = langMap[lang] || 'eng_Latn';
+      
+      const translator = await getTranslatorPipeline((data: any) => {
+        if (data.status === 'downloading') {
+          setLoadingText(`Downloading NLLB Translator...`);
+          setDownloadProgress((data.loaded / data.total) * 100);
+        } else if (data.status === 'ready') {
+          setLoadingText('Translator ready!');
+          setDownloadProgress(100);
+        }
+      });
+      setModelReady(true);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Translating ${currentContext.length} characters...` }]);
+      
+      // Limit context size to avoid memory issues with translation
+      const textToTranslate = currentContext.substring(0, 500);
+      
+      const result = await translator(textToTranslate, {
+        src_lang: 'eng_Latn', // Assumption for now, or detect
+        tgt_lang: targetLang
+      });
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: `**Translation (${lang}):**\n\n${result[0].translation_text}` }]);
+    } catch (err: any) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Translation failed: ${err.message}` }]);
+    } finally {
+      setIsTyping(false);
+      setModelReady(true);
+    }
   };
   const summarizePage = () => handleSend(undefined, "Please summarize the content of this page.");
 
